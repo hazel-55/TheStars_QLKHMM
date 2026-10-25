@@ -1,0 +1,13 @@
+# Cấu hình chứa thông tin database cá nhân
+.env
+
+# Thư viện cài bằng công cụ quản lý package
+/vendor/
+/node_modules/
+
+# File log
+*.log
+
+# File hệ thống
+Thumbs.db
+.DS_Store
