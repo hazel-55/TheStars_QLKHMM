@@ -152,7 +152,7 @@ class XuatNguyenLieu
     }
 
     /*
-     * Lấy nguyên liệu thuộc một kế hoạch.
+     * Lấy nguyên liệu thuộc kế hoạch.
      */
     public function layChiTietKeHoach($makehoach)
     {
