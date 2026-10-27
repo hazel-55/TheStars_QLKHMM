@@ -34,6 +34,13 @@ return [
                 ['key' => 'trang-chu', 'label' => 'Trang chủ', 'url' => $baseUrl . '/pages/trang-chu/index.php', 'icon' => '⌂'],
             ],
         ],
+        'QUAN_LY_XUONG' => [
+            'roleName' => 'Quản lý xưởng',
+            'items' => [
+                ['key' => 'trang-chu', 'label' => 'Trang chủ', 'url' => $baseUrl . '/pages/trang-chu/index.php', 'icon' => '⌂'],
+                ['key' => 'xuat-nguyen-lieu', 'label' => 'Lập yêu cầu xuất nguyên liệu', 'url' => $baseUrl . '/pages/xuat_nguyenlieu/index.php', 'icon' => '▤'],
+            ],
+        ],
     ],
     'bottomItems' => [],
 ];
