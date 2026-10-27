@@ -209,13 +209,13 @@ renderSidebar(
 
                                                 <a
                                                     class="xnl-button xnl-primary"
-                                                    href="sua_yeu_cau.php?mayeucau=<?= urlencode((string) $phieu['mayeucau']) ?>">
+                                                    href="suaphieu.php?mayeucau=<?= urlencode((string) $phieu['mayeucau']) ?>">
                                                     Sửa
                                                 </a>
 
                                                 <form
                                                     method="post"
-                                                    action="xoa_yeu_cau.php"
+                                                    action="xoaphieu.php"
                                                     onsubmit="return confirm('Bạn có chắc chắn muốn xóa phiếu này không?');">
 
                                                     <input
