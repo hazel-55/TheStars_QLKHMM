@@ -1,0 +1,278 @@
+const body = document.querySelector('#lines');
+const source = document.querySelector('#source');
+
+let serial = 0;
+
+function make(tag, text, cls) {
+    const el = document.createElement(tag);
+
+    if (text !== undefined) el.textContent = text;
+    if (cls) el.className = cls;
+
+    return el;
+}
+
+function refresh() {
+    if (!body) return;
+
+    let count = 0;
+
+    for (const row of body.rows) {
+        const select = row.querySelector('select');
+        const qty = row.querySelector('input[type=number]');
+
+        const p = CK.products.find(
+            p => p.maBienThe === select.value
+        );
+
+        const s = CK.stock.find(
+            s => s.maKho === source.value &&
+                 s.maBienThe === p?.maBienThe
+        );
+
+        const available = Number(s?.available ?? 0);
+        const isPiece = p?.donViTinh === 'Cái';
+
+        row.querySelector('.unit').textContent =
+            p?.donViTinh ?? '—';
+
+        row.querySelector('.available').textContent =
+            p ? available.toLocaleString('vi-VN') : '—';
+
+        // SỬA: Đồng bộ min và step theo đơn vị tính
+        qty.min = isPiece ? '1' : '0.001';
+        qty.step = isPiece ? '1' : '0.001';
+
+        // Kiểm tra số lượng
+        if (!CK.readonly) {
+            const value = Number(qty.value);
+
+            let error = '';
+
+            if (qty.value !== '') {
+                if (value <= 0) {
+                    error = 'Số lượng phải lớn hơn 0.';
+                } else if (isPiece && !Number.isInteger(value)) {
+                    error = 'Hàng có đơn vị Cái phải nhập số nguyên.';
+                } else if (value > available) {
+                    error = 'Số lượng vượt tồn khả dụng.';
+                }
+            }
+
+            qty.setCustomValidity(error);
+            qty.max = String(available);
+        }
+
+        row.classList.toggle(
+            'over',
+            !CK.readonly &&
+            qty.value !== '' &&
+            Number(qty.value) > available
+        );
+
+        if (p) count++;
+    }
+
+    const summary = document.querySelector('#summary');
+
+    if (summary) {
+        summary.textContent = count + ' dòng hàng';
+    }
+}
+
+function addLine(data = {}) {
+    const n = serial++;
+    const tr = make('tr');
+    const sel = make('select');
+
+    sel.name = `rows[${n}][maBienThe]`;
+    sel.required = true;
+    sel.disabled = CK.readonly;
+    sel.setAttribute('aria-label', 'Hàng hóa');
+
+    sel.append(new Option('Chọn hàng hóa / biến thể', ''));
+
+    for (const p of CK.products) {
+        sel.append(
+            new Option(
+                `${p.maBienThe} · ${p.tenHangHoa} / ${p.mauSac} / ${p.kichThuoc}`,
+                p.maBienThe
+            )
+        );
+    }
+
+    if (
+        data.maBienThe &&
+        !CK.products.some(p => p.maBienThe === data.maBienThe)
+    ) {
+        sel.append(
+            new Option(
+                data.maBienThe + ' (ngừng hoạt động)',
+                data.maBienThe
+            )
+        );
+    }
+
+    sel.value = data.maBienThe ?? '';
+
+    const td = make('td');
+    td.append(sel);
+
+    tr.append(
+        td,
+        make('td', '—', 'unit'),
+        make('td', '—', 'available')
+    );
+
+    // Ô nhập số lượng
+    const qt = make('td');
+    const qty = make('input');
+
+    qty.type = 'number';
+    qty.name = `rows[${n}][soLuongYeuCau]`;
+
+    // SỬA: Giá trị mặc định khi chưa chọn hàng
+    qty.min = '0.001';
+    qty.step = '0.001';
+
+    qty.required = true;
+    qty.value = data.soLuongYeuCau ?? '';
+    qty.disabled = CK.readonly;
+    qty.setAttribute('aria-label', 'Số lượng chuyển');
+
+    qt.append(qty);
+    tr.append(qt);
+
+    // Ghi chú
+    const nt = make('td');
+    const note = make('input');
+
+    note.name = `rows[${n}][ghiChu]`;
+    note.value = data.ghiChu ?? '';
+    note.maxLength = 255;
+    note.placeholder = 'Ghi chú';
+    note.disabled = CK.readonly;
+    note.setAttribute('aria-label', 'Ghi chú hàng hóa');
+
+    nt.append(note);
+    tr.append(nt);
+
+    // Nút xóa dòng hàng
+    const dt = make('td');
+
+    if (!CK.readonly) {
+        const del = make('button', '×', 'remove');
+
+        del.type = 'button';
+        del.setAttribute('aria-label', 'Xóa dòng hàng');
+
+        del.onclick = () => {
+            tr.remove();
+            refresh();
+        };
+
+        dt.append(del);
+    }
+
+    tr.append(dt);
+    body.append(tr);
+
+    sel.onchange = refresh;
+    qty.oninput = refresh;
+
+    refresh();
+}
+
+if (body) {
+    for (const r of CK.rows) {
+        addLine(r);
+    }
+
+    if (source) {
+        source.onchange = refresh;
+    }
+
+    document.querySelector('#addRow')?.addEventListener(
+        'click',
+        () => {
+            if (body.rows.length < 100) {
+                addLine();
+            }
+        }
+    );
+
+    document.querySelector('#requestForm')?.addEventListener(
+        'submit',
+        e => {
+            if (e.submitter?.value === 'cancel') {
+                if (!confirm(
+                    'Hủy phiếu nháp này? Phiếu sẽ được giữ lại với trạng thái Đã hủy.'
+                )) {
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            const ids = [
+                ...body.querySelectorAll('select')
+            ].map(x => x.value);
+
+            let message = '';
+
+            if (
+                source.value ===
+                document.querySelector('#destination').value
+            ) {
+                message = 'Kho xuất và kho nhập phải khác nhau.';
+            } else if (ids.length === 0) {
+                message = 'Hãy thêm ít nhất một dòng hàng.';
+            } else if (
+                new Set(ids).size !== ids.length
+            ) {
+                message = 'Một biến thể chỉ xuất hiện một lần trong phiếu.';
+            }
+
+            if (message) {
+                e.preventDefault();
+                alert(message);
+                return;
+            }
+
+            if (
+                e.submitter?.value === 'send' &&
+                !confirm(
+                    'Gửi phê duyệt? Sau khi gửi, bạn không thể sửa hoặc hủy phiếu.'
+                )
+            ) {
+                e.preventDefault();
+            }
+        }
+    );
+}
+
+// Tìm kiếm phiếu
+document.querySelector('#search')?.addEventListener(
+    'input',
+    e => {
+        const q = e.target.value.toLocaleLowerCase('vi').trim();
+        let visible = 0;
+
+        const history = document.querySelector('#history');
+
+        if (!history) return;
+
+        for (const r of history.rows) {
+            r.hidden = !r.textContent
+                .toLocaleLowerCase('vi')
+                .includes(q);
+
+            if (!r.hidden) visible++;
+        }
+
+        const noResults = document.querySelector('#noResults');
+
+        if (noResults) {
+            noResults.hidden = visible > 0 || !q;
+        }
+    }
+);
