@@ -27,7 +27,9 @@ renderSidebar(
     $menuConfig['bottomItems'] ?? []
 );
 ?>
-<link rel="stylesheet" href="<?= h(rtrim($menuConfig['baseUrl'], '/') . '/pages/chuyen-kho/style.css') ?>">
+<!-- CSS riêng của chức năng Lập yêu cầu chuyển kho -->
+<link rel="stylesheet"
+      href="<?= h(rtrim($menuConfig['baseUrl'], '/') . '/assets/css/style.css') ?>">
 <main class="app-main">
     <div class="ck-page">
         <div class="heading">
@@ -82,4 +84,4 @@ renderSidebar(
 </main>
 <?php renderFooter(); ?>
 <script>const CK = <?= json_encode(['products' => $products, 'stock' => $stock, 'rows' => $inputRows, 'readonly' => (bool) $readonly], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;</script>
-<script src="app.js"></script>
+<script src="<?= h(rtrim($menuConfig['baseUrl'], '/') . '/assets/js/app.js') ?>"></script>
