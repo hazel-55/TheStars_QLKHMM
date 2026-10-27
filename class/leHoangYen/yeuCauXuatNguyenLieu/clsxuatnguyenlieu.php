@@ -10,10 +10,6 @@ class XuatNguyenLieu
         $this->conn = $conn;
     }
 
-    /*
-     * Tạo mã tuần tự.
-     * Hàm này phải được gọi bên trong transaction.
-     */
     private function taoMaTuDong($loaiMa)
     {
         if ($loaiMa === 'YCXNL') {
@@ -28,9 +24,7 @@ class XuatNguyenLieu
             throw new Exception('Loại mã không hợp lệ.');
         }
 
-        // Khởi tạo số thứ tự dựa trên dữ liệu hiện có,
-        // tránh tạo lại mã đã được sử dụng trước đây.
-        $sqlMax = "
+        $sql = "
             SELECT COALESCE(
                 MAX(CAST(SUBSTRING($cotMa, " . ($doDaiTienTo + 1) . ") AS UNSIGNED)),
                 0
@@ -40,83 +34,54 @@ class XuatNguyenLieu
         ";
 
         $mauMa = $loaiMa . '%';
-        $stmtMax = $this->conn->prepare($sqlMax);
+        $stmt = $this->conn->prepare($sql);
 
-        if (!$stmtMax) {
+        if (!$stmt) {
             throw new Exception('Không thể kiểm tra số thứ tự mã.');
         }
 
-        $stmtMax->bind_param('s', $mauMa);
-        $stmtMax->execute();
-        $soCuoiCSDL = (int) $stmtMax->get_result()->fetch_assoc()['so_cuoi'];
-        $stmtMax->close();
+        $stmt->bind_param('s', $mauMa);
 
-        $sqlTao = "
-            INSERT IGNORE INTO boma_tudong (LoaiMa, SoCuoi)
-            VALUES (?, ?)
-        ";
-
-        $stmtTao = $this->conn->prepare($sqlTao);
-        $stmtTao->bind_param('si', $loaiMa, $soCuoiCSDL);
-        $stmtTao->execute();
-        $stmtTao->close();
-
-        // Khóa dòng số thứ tự trong transaction.
-        $sqlDoc = "
-            SELECT SoCuoi
-            FROM boma_tudong
-            WHERE LoaiMa = ?
-            FOR UPDATE
-        ";
-
-        $stmtDoc = $this->conn->prepare($sqlDoc);
-        $stmtDoc->bind_param('s', $loaiMa);
-        $stmtDoc->execute();
-
-        $dong = $stmtDoc->get_result()->fetch_assoc();
-        $stmtDoc->close();
-
-        if (!$dong) {
-            throw new Exception('Không lấy được số thứ tự mã.');
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new Exception('Không thể lấy số thứ tự mã.');
         }
 
-        $soMoi = max((int) $dong['SoCuoi'], $soCuoiCSDL) + 1;
+        $dong = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
 
-        $sqlCapNhat = "
-            UPDATE boma_tudong
-            SET SoCuoi = ?
-            WHERE LoaiMa = ?
-        ";
+        $soMoi = (int) $dong['so_cuoi'] + 1;
 
-        $stmtCapNhat = $this->conn->prepare($sqlCapNhat);
-        $stmtCapNhat->bind_param('is', $soMoi, $loaiMa);
-        $stmtCapNhat->execute();
-        $stmtCapNhat->close();
-
-        return $loaiMa . str_pad((string) $soMoi, 3, '0', STR_PAD_LEFT);
+        return $loaiMa . str_pad(
+            (string) $soMoi,
+            3,
+            '0',
+            STR_PAD_LEFT
+        );
     }
 
     /*
-     * Lấy tất cả kế hoạch của xưởng.
-     * Bao gồm cả kế hoạch đang chờ duyệt để hiển thị,
-     * nhưng chỉ kế hoạch đã duyệt mới được lập phiếu.
+     * Lấy danh sách kế hoạch đã duyêt
      */
+
     public function layDanhSachKeHoach($maxuong, $tukhoa = '')
     {
         $sql = "
-            SELECT
-                kh.makehoach,
-                kh.maxuong,
-                kh.ngaylap,
-                kh.ngaypheduyet,
-                kh.trangthaipheduyet,
-                py.mayeucau,
-                py.trangthai AS trangthaiphieu
-            FROM kehoachsanxuat kh
-            LEFT JOIN phieuyeucauxuatnguyenlieu py
-                ON py.makehoach = kh.makehoach
-            WHERE kh.maxuong = ?
-        ";
+        SELECT
+            kh.makehoach,
+            kh.maxuong,
+            kh.ngaylap,
+            kh.ngaypheduyet,
+            kh.trangthaipheduyet,
+            py.mayeucau,
+            py.trangthai AS trangthaiphieu
+        FROM kehoachsanxuat kh
+        LEFT JOIN phieuyeucauxuatnguyenlieu py
+            ON py.makehoach = kh.makehoach
+        WHERE kh.maxuong = ?
+          AND LOWER(TRIM(kh.trangthaipheduyet))
+              IN ('đã duyệt', 'da duyet')
+    ";
 
         if ($tukhoa !== '') {
             $sql .= " AND kh.makehoach LIKE ?";
@@ -150,9 +115,9 @@ class XuatNguyenLieu
         return $danhSach;
     }
 
+
     /*
      * Chỉ trả về kế hoạch đã duyệt của đúng xưởng.
-     * Dùng để kiểm tra trước khi lập phiếu.
      */
     public function layThongTinKeHoach($makehoach, $maxuong)
     {
@@ -166,7 +131,8 @@ class XuatNguyenLieu
             FROM kehoachsanxuat
             WHERE makehoach = ?
               AND maxuong = ?
-             AND LOWER(TRIM(trangthaipheduyet)) IN ('đã duyệt', 'da duyet')
+              AND LOWER(TRIM(trangthaipheduyet))
+                  IN ('đã duyệt', 'da duyet')
             LIMIT 1
         ";
 
@@ -235,28 +201,27 @@ class XuatNguyenLieu
     public function layPhieuTheoKeHoach($makehoach)
     {
         $sql = "
-        SELECT
-            MaYeuCau AS mayeucau,
-            MaKeHoach AS makehoach,
-            NgayLap AS ngaylap,
-            GhiChu AS ghichu,
-            TrangThai AS trangthai
-        FROM phieuyeucauxuatnguyenlieu
-        WHERE MaKeHoach = ?
-        LIMIT 1
-    ";
+            SELECT
+                MaYeuCau AS mayeucau,
+                MaKeHoach AS makehoach,
+                NgayLap AS ngaylap,
+                GhiChu AS ghichu,
+                TrangThai AS trangthai
+            FROM phieuyeucauxuatnguyenlieu
+            WHERE MaKeHoach = ?
+            LIMIT 1
+        ";
 
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('s', $makehoach);
         $stmt->execute();
 
-        $result = $stmt->get_result();
-        $phieu = $result->fetch_assoc();
-
+        $phieu = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         return $phieu ?: null;
     }
+
     /*
      * Lập phiếu yêu cầu xuất nguyên liệu.
      */
@@ -282,7 +247,6 @@ class XuatNguyenLieu
         try {
             $this->conn->begin_transaction();
 
-            // Khóa kế hoạch để hạn chế hai yêu cầu lập phiếu cùng lúc.
             $sqlKhoa = "
                 SELECT makehoach, maxuong, trangthaipheduyet
                 FROM kehoachsanxuat
@@ -314,8 +278,11 @@ class XuatNguyenLieu
                     'Kế hoạch chưa được duyệt nên không thể lập phiếu.'
                 );
             }
+
             if ($this->layPhieuTheoKeHoach($makehoach)) {
-                throw new Exception('Kế hoạch này đã có phiếu yêu cầu xuất nguyên liệu.');
+                throw new Exception(
+                    'Kế hoạch này đã có phiếu yêu cầu xuất nguyên liệu.'
+                );
             }
 
             $chiTietKeHoach = $this->layChiTietKeHoach($makehoach);
@@ -333,7 +300,12 @@ class XuatNguyenLieu
             ";
 
             $stmtPhieu = $this->conn->prepare($sqlPhieu);
-            $stmtPhieu->bind_param('sss', $maYeuCau, $makehoach, $ghichu);
+            $stmtPhieu->bind_param(
+                'sss',
+                $maYeuCau,
+                $makehoach,
+                $ghichu
+            );
 
             if (!$stmtPhieu->execute()) {
                 throw new Exception('Không thể lưu phiếu yêu cầu.');
@@ -437,19 +409,19 @@ class XuatNguyenLieu
     public function layThongTinPhieu($mayeucau, $maxuong)
     {
         $sql = "
-        SELECT
-            py.mayeucau AS mayeucau,
-            py.makehoach AS makehoach,
-            py.ngaylap AS ngaylap,
-            py.ghichu AS ghichu,
-            py.trangthai AS trangthai
-        FROM phieuyeucauxuatnguyenlieu py
-        INNER JOIN kehoachsanxuat kh
-            ON kh.makehoach = py.makehoach
-        WHERE py.mayeucau = ?
-          AND kh.maxuong = ?
-        LIMIT 1
-    ";
+            SELECT
+                py.mayeucau AS mayeucau,
+                py.makehoach AS makehoach,
+                py.ngaylap AS ngaylap,
+                py.ghichu AS ghichu,
+                py.trangthai AS trangthai
+            FROM phieuyeucauxuatnguyenlieu py
+            INNER JOIN kehoachsanxuat kh
+                ON kh.makehoach = py.makehoach
+            WHERE py.mayeucau = ?
+              AND kh.maxuong = ?
+            LIMIT 1
+        ";
 
         $stmt = $this->conn->prepare($sql);
 
@@ -462,13 +434,12 @@ class XuatNguyenLieu
         $stmt->bind_param('ss', $mayeucau, $maxuong);
         $stmt->execute();
 
-        $result = $stmt->get_result();
-        $phieu = $result->fetch_assoc();
-
+        $phieu = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         return $phieu ?: null;
     }
+
     /*
      * Lấy các dòng chi tiết của một phiếu.
      */
@@ -514,8 +485,12 @@ class XuatNguyenLieu
      * $soLuongTheoChiTiet là mảng:
      * [MaChiTietKeHoach => SoLuongYeuCau]
      */
-    public function suaYeuCauXuat($mayeucau, $maxuong, $ghichu, $soLuongTheoChiTiet)
-    {
+    public function suaYeuCauXuat(
+        $mayeucau,
+        $maxuong,
+        $ghichu,
+        $soLuongTheoChiTiet
+    ) {
         $ghichu = trim($ghichu);
 
         if (mb_strlen($ghichu, 'UTF-8') > 500) {

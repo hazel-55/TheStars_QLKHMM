@@ -50,12 +50,12 @@ if ($mayeucau === '') {
             $thongBao = 'Không tìm thấy phiếu hoặc phiếu không thuộc xưởng của bạn.';
         } else {
             // Lấy mã kế hoạch theo cả tên cột thường và tên cột viết hoa.
-          $makehoach = trim((string) (
-    $phieu['makehoach']
-    ?? $phieu['MaKeHoach']
-    ?? $phieu['MAKEHOACH']
-    ?? ''
-));
+            $makehoach = trim((string) (
+                $phieu['makehoach']
+                ?? $phieu['MaKeHoach']
+                ?? $phieu['MAKEHOACH']
+                ?? ''
+            ));
             // Xử lý lưu thay đổi.
             if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ghichu = trim($_POST['ghichu'] ?? '');
@@ -77,20 +77,20 @@ if ($mayeucau === '') {
                     $_SESSION['thongbao_xuat'] = $thongBao;
                     $_SESSION['loai_thongbao_xuat'] = 'success';
 
-                   $makehoachSauKhiLuu = trim((string) (
-    $_POST['makehoach'] ?? $makehoach
-));
+                    $makehoachSauKhiLuu = trim((string) (
+                        $_POST['makehoach'] ?? $makehoach
+                    ));
 
-if ($makehoachSauKhiLuu !== '') {
-    header(
-        'Location: chitiet.php?makehoach='
-        . urlencode($makehoachSauKhiLuu)
-    );
-} else {
-    header('Location: index.php');
-}
+                    if ($makehoachSauKhiLuu !== '') {
+                        header(
+                            'Location: chitiet.php?makehoach='
+                                . urlencode($makehoachSauKhiLuu)
+                        );
+                    } else {
+                        header('Location: index.php');
+                    }
 
-exit;
+                    exit;
                     exit;
                 }
             }
@@ -129,8 +129,7 @@ renderSidebar(
 
 <div class="app-main">
     <main class="xnl-page">
-        <a class="xnl-back"
-            href="<?= htmlspecialchars($baseUrl . '/page/xuat_nguyen_lieu/index.php', ENT_QUOTES, 'UTF-8') ?>">
+        <a class="xnl-back" href="index.php">
             ← Quay lại danh sách kế hoạch
         </a>
 
@@ -186,16 +185,16 @@ renderSidebar(
                     </div>
                 </div>
 
-               <form method="post"
-    action="suaphieu.php?mayeucau=<?= urlencode($mayeucau) ?>"
-    data-xnl-form
-    data-action="edit">
+                <form method="post"
+                    action="suaphieu.php?mayeucau=<?= urlencode($mayeucau) ?>"
+                    data-xnl-form
+                    data-action="edit">
 
-    <input type="hidden" name="mayeucau"
-        value="<?= htmlspecialchars($mayeucau, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="mayeucau"
+                        value="<?= htmlspecialchars($mayeucau, ENT_QUOTES, 'UTF-8') ?>">
 
-    <input type="hidden" name="makehoach"
-        value="<?= htmlspecialchars($makehoach, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="makehoach"
+                        value="<?= htmlspecialchars($makehoach, ENT_QUOTES, 'UTF-8') ?>">
 
                     <div class="xnl-form-group">
                         <label for="ghichu">Ghi chú</label>
