@@ -1,14 +1,13 @@
-const body = document.querySelector('#lines');
-const source = document.querySelector('#source');
+
+const body = document.querySelector('#lines'),
+    source = document.querySelector('#source');
 
 let serial = 0;
 
 function make(tag, text, cls) {
     const el = document.createElement(tag);
-
     if (text !== undefined) el.textContent = text;
     if (cls) el.className = cls;
-
     return el;
 }
 
@@ -18,11 +17,8 @@ function refresh() {
     let count = 0;
 
     for (const row of body.rows) {
-        const select = row.querySelector('select');
-        const qty = row.querySelector('input[type=number]');
-
         const p = CK.products.find(
-            p => p.maBienThe === select.value
+            p => p.maBienThe === row.querySelector('select').value
         );
 
         const s = CK.stock.find(
@@ -31,6 +27,7 @@ function refresh() {
         );
 
         const available = Number(s?.available ?? 0);
+        const qty = row.querySelector('input[type=number]');
         const isPiece = p?.donViTinh === 'Cái';
 
         row.querySelector('.unit').textContent =
@@ -39,14 +36,12 @@ function refresh() {
         row.querySelector('.available').textContent =
             p ? available.toLocaleString('vi-VN') : '—';
 
-        // SỬA: Đồng bộ min và step theo đơn vị tính
+        // Đơn vị Cái nhập số nguyên, Mét/Kg nhập được số thập phân
         qty.min = isPiece ? '1' : '0.001';
         qty.step = isPiece ? '1' : '0.001';
 
-        // Kiểm tra số lượng
         if (!CK.readonly) {
             const value = Number(qty.value);
-
             let error = '';
 
             if (qty.value !== '') {
@@ -59,8 +54,8 @@ function refresh() {
                 }
             }
 
-            qty.setCustomValidity(error);
             qty.max = String(available);
+            qty.setCustomValidity(error);
         }
 
         row.classList.toggle(
@@ -74,16 +69,13 @@ function refresh() {
     }
 
     const summary = document.querySelector('#summary');
-
-    if (summary) {
-        summary.textContent = count + ' dòng hàng';
-    }
+    if (summary) summary.textContent = count + ' dòng hàng';
 }
 
 function addLine(data = {}) {
-    const n = serial++;
-    const tr = make('tr');
-    const sel = make('select');
+    const n = serial++,
+        tr = make('tr'),
+        sel = make('select');
 
     sel.name = `rows[${n}][maBienThe]`;
     sel.required = true;
@@ -93,24 +85,20 @@ function addLine(data = {}) {
     sel.append(new Option('Chọn hàng hóa / biến thể', ''));
 
     for (const p of CK.products) {
-        sel.append(
-            new Option(
-                `${p.maBienThe} · ${p.tenHangHoa} / ${p.mauSac} / ${p.kichThuoc}`,
-                p.maBienThe
-            )
-        );
+        sel.append(new Option(
+            `${p.maBienThe} · ${p.tenHangHoa} / ${p.mauSac} / ${p.kichThuoc}`,
+            p.maBienThe
+        ));
     }
 
     if (
         data.maBienThe &&
         !CK.products.some(p => p.maBienThe === data.maBienThe)
     ) {
-        sel.append(
-            new Option(
-                data.maBienThe + ' (ngừng hoạt động)',
-                data.maBienThe
-            )
-        );
+        sel.append(new Option(
+            data.maBienThe + ' (ngừng hoạt động)',
+            data.maBienThe
+        ));
     }
 
     sel.value = data.maBienThe ?? '';
@@ -124,28 +112,29 @@ function addLine(data = {}) {
         make('td', '—', 'available')
     );
 
-    // Ô nhập số lượng
-    const qt = make('td');
-    const qty = make('input');
+    const qt = make('td'),
+        qty = make('input');
 
     qty.type = 'number';
-    qty.name = `rows[${n}][soLuongYeuCau]`;
 
-    // SỬA: Giá trị mặc định khi chưa chọn hàng
+    // Đồng bộ tên trường với database mới
+    qty.name = `rows[${n}][soLuongChuyen]`;
+
     qty.min = '0.001';
     qty.step = '0.001';
-
     qty.required = true;
-    qty.value = data.soLuongYeuCau ?? '';
+
+    qty.value = data.soLuongChuyen ??
+                data.soLuongYeuCau ?? '';
+
     qty.disabled = CK.readonly;
     qty.setAttribute('aria-label', 'Số lượng chuyển');
 
     qt.append(qty);
     tr.append(qt);
 
-    // Ghi chú
-    const nt = make('td');
-    const note = make('input');
+    const nt = make('td'),
+        note = make('input');
 
     note.name = `rows[${n}][ghiChu]`;
     note.value = data.ghiChu ?? '';
@@ -157,7 +146,6 @@ function addLine(data = {}) {
     nt.append(note);
     tr.append(nt);
 
-    // Nút xóa dòng hàng
     const dt = make('td');
 
     if (!CK.readonly) {
@@ -184,20 +172,14 @@ function addLine(data = {}) {
 }
 
 if (body) {
-    for (const r of CK.rows) {
-        addLine(r);
-    }
+    for (const r of CK.rows) addLine(r);
 
-    if (source) {
-        source.onchange = refresh;
-    }
+    if (source) source.onchange = refresh;
 
     document.querySelector('#addRow')?.addEventListener(
         'click',
         () => {
-            if (body.rows.length < 100) {
-                addLine();
-            }
+            if (body.rows.length < 100) addLine();
         }
     );
 
@@ -226,9 +208,7 @@ if (body) {
                 message = 'Kho xuất và kho nhập phải khác nhau.';
             } else if (ids.length === 0) {
                 message = 'Hãy thêm ít nhất một dòng hàng.';
-            } else if (
-                new Set(ids).size !== ids.length
-            ) {
+            } else if (new Set(ids).size !== ids.length) {
                 message = 'Một biến thể chỉ xuất hiện một lần trong phiếu.';
             }
 
@@ -250,16 +230,16 @@ if (body) {
     );
 }
 
-// Tìm kiếm phiếu
+// Tìm kiếm yêu cầu chuyển kho
 document.querySelector('#search')?.addEventListener(
     'input',
     e => {
         const q = e.target.value.toLocaleLowerCase('vi').trim();
-        let visible = 0;
-
         const history = document.querySelector('#history');
 
         if (!history) return;
+
+        let visible = 0;
 
         for (const r of history.rows) {
             r.hidden = !r.textContent

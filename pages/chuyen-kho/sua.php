@@ -66,8 +66,8 @@ renderSidebar(
                                         <option value="<?= h($w['maKho']) ?>" <?= $form['maKhoNhap'] === $w['maKho'] ? 'selected' : '' ?>>
                                             <?= h($w['tenKho']) ?></option><?php endforeach ?>
                                 </select></label></div>
-                        <label>Lý do chuyển kho <em>*</em><textarea name="lyDo" maxlength="500" rows="2" required
-                                placeholder="Nhập lý do điều chuyển hàng hóa…"><?= h($form['lyDo']) ?></textarea></label>
+                        <label>Lý do chuyển kho <em>*</em><textarea name="lyDoChuyen" maxlength="500" rows="2" required
+                                placeholder="Nhập lý do điều chuyển hàng hóa…"><?= h($form['lyDoChuyen']) ?></textarea></label>
                     </fieldset>
                 </section>
                 <section class="card">
