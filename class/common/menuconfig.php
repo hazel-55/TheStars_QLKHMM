@@ -42,5 +42,13 @@ return [
             ],
         ],
     ],
-    'bottomItems' => [],
+    'bottomItems' => [
+    [
+        'key' => 'thong-tin-ca-nhan',
+        'label' => 'Thông tin cá nhân',
+        'url' => $baseUrl
+            . '/pages/thong-tin-ca-nhan/thong-tin-ca-nhan.php?mode=view',
+        'icon' => '○',
+    ],
+],
 ];
