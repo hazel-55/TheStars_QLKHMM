@@ -8,7 +8,6 @@ if (session_status() === PHP_SESSION_NONE) {
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store');
 
-// Đường dẫn thư mục gốc dự án.
 $rootPath = dirname(__DIR__, 2);
 
 require_once $rootPath . '/class/common/connect.php';
@@ -20,8 +19,8 @@ $menuConfig = require $rootPath . '/class/common/menuconfig.php';
 
 $quanLyCaNhan = new ThongTinCaNhan($conn);
 
-// Tài khoản mẫu để chạy thử không cần đăng nhập.
-$maTaiKhoan = 'ND001';
+// Tài khoản mẫu đã đổi từ ND001 sang mã số 1.
+$maTaiKhoan = '1';
 
 $baseUrl = rtrim($menuConfig['baseUrl'], '/');
 
@@ -40,7 +39,6 @@ function caNhanEscape($value): string
     );
 }
 
-// Mặc định hiển thị trang chủ.
 $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
 
 $mode = $_GET['mode'] ?? 'home';
@@ -56,13 +54,13 @@ if ($isPost) {
     $mode = 'edit';
 }
 
-// Lấy thông tin cá nhân qua class.
+// Lấy thông tin qua class.
 try {
     $nguoiDung = $quanLyCaNhan->layThongTin($maTaiKhoan);
 
     if (!$nguoiDung) {
         http_response_code(404);
-        exit('Không tìm thấy người dùng mẫu ND001.');
+        exit('Không tìm thấy người dùng có mã 1.');
     }
 } catch (Throwable $e) {
     error_log((string) $e);
@@ -84,7 +82,7 @@ if (
     $_SESSION['csrf_ca_nhan'] = bin2hex(random_bytes(32));
 }
 
-// Xử lý lưu thông tin.
+// Xử lý cập nhật.
 if ($isPost) {
     $token = $_POST['csrf_token'] ?? '';
 
@@ -96,12 +94,9 @@ if ($isPost) {
         exit('Yêu cầu không hợp lệ. Vui lòng tải lại trang.');
     }
 
+    // Vai trò và bộ phận gửi thêm từ trình duyệt cũng bị bỏ qua.
     $form = $quanLyCaNhan->chuanHoaDuLieu($_POST);
-
-    $loi = $quanLyCaNhan->kiemTraDuLieu(
-        $form,
-        $menuConfig['roles']
-    );
+    $loi = $quanLyCaNhan->kiemTraDuLieu($form);
 
     if (!$loi) {
         try {
@@ -125,7 +120,7 @@ if ($isPost) {
     }
 }
 
-// Lấy menu của vai trò đã lưu trong database.
+// Vai trò lấy từ database, không lấy từ form.
 $roleCode = (string) ($nguoiDung['VaiTro'] ?? '');
 
 $roleConfig = $menuConfig['roles'][$roleCode] ?? [
@@ -141,7 +136,6 @@ $tieuDe = [
     'edit' => 'Chỉnh sửa thông tin cá nhân',
 ][$mode];
 
-// Gọi các thành phần giao diện chung.
 require_once $rootPath . '/components/layout/header.php';
 require_once $rootPath . '/components/layout/sidebar.php';
 require_once $rootPath . '/components/layout/footer.php';
@@ -281,11 +275,6 @@ renderHeader(
             <?php else: ?>
 
                 <!-- CHỈNH SỬA THÔNG TIN -->
-                <p class="personal-description">
-                    Cập nhật thông tin bên dưới.
-                    Các trường có dấu * là bắt buộc.
-                </p>
-
                 <?php if (isset($loi['Chung'])): ?>
                     <p class="personal-error" role="alert">
                         <?= caNhanEscape($loi['Chung']) ?>
@@ -310,6 +299,7 @@ renderHeader(
 
                         <input
                             id="MaTaiKhoan"
+                            type="text"
                             readonly
                             value="<?= caNhanEscape(
                                 $nguoiDung['MaTaiKhoan']
@@ -402,41 +392,14 @@ renderHeader(
                     <?php endforeach; ?>
 
                     <div class="personal-field">
-                        <label for="VaiTro">Vai trò *</label>
+                        <label for="VaiTro">Vai trò</label>
 
-                        <select
+                        <input
                             id="VaiTro"
-                            name="VaiTro"
-                            required
-
-                            <?php if (isset($loi['VaiTro'])): ?>
-                                aria-invalid="true"
-                                aria-describedby="VaiTro-error"
-                            <?php endif; ?>
+                            type="text"
+                            readonly
+                            value="<?= caNhanEscape($roleName) ?>"
                         >
-                            <option value="">-- Chọn vai trò --</option>
-
-                            <?php foreach ($menuConfig['roles'] as $ma => $config): ?>
-                                <option
-                                    value="<?= caNhanEscape($ma) ?>"
-                                    <?= $form['VaiTro'] === (string) $ma
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-                                    <?= caNhanEscape($config['roleName']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-
-                        <?php if (isset($loi['VaiTro'])): ?>
-                            <p
-                                class="personal-error"
-                                id="VaiTro-error"
-                                role="alert"
-                            >
-                                <?= caNhanEscape($loi['VaiTro']) ?>
-                            </p>
-                        <?php endif; ?>
                     </div>
 
                     <div class="personal-field">
@@ -444,6 +407,7 @@ renderHeader(
 
                         <input
                             id="BoPhan"
+                            type="text"
                             readonly
                             value="<?= caNhanEscape(
                                 $nguoiDung['BoPhan']

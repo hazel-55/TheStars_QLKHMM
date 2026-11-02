@@ -15,7 +15,7 @@ class ThongTinCaNhan
         $stmt = $this->conn->prepare(
             'SELECT MaTaiKhoan, HoTen, Email, NgaySinh,
                     SoDienThoai, VaiTro, BoPhan
-             FROM NguoiDung
+             FROM nguoidung
              WHERE MaTaiKhoan = ?'
         );
 
@@ -32,8 +32,9 @@ class ThongTinCaNhan
     {
         $ketQua = [];
 
+        // Chỉ nhận những trường được phép chỉnh sửa.
         foreach (
-            ['HoTen', 'Email', 'NgaySinh', 'SoDienThoai', 'VaiTro']
+            ['HoTen', 'Email', 'NgaySinh', 'SoDienThoai']
             as $ten
         ) {
             $giaTri = $duLieu[$ten] ?? '';
@@ -46,10 +47,8 @@ class ThongTinCaNhan
         return $ketQua;
     }
 
-    public function kiemTraDuLieu(
-        array $duLieu,
-        array $danhSachVaiTro
-    ): array {
+    public function kiemTraDuLieu(array $duLieu): array
+    {
         $loi = [];
 
         $doDaiTen = preg_match_all('/./us', $duLieu['HoTen']);
@@ -101,15 +100,6 @@ class ThongTinCaNhan
             }
         }
 
-        if (
-            !array_key_exists(
-                $duLieu['VaiTro'],
-                $danhSachVaiTro
-            )
-        ) {
-            $loi['VaiTro'] = 'Vui lòng chọn vai trò hợp lệ.';
-        }
-
         return $loi;
     }
 
@@ -120,29 +110,27 @@ class ThongTinCaNhan
         $hoTen = $duLieu['HoTen'];
         $email = $duLieu['Email'];
         $soDienThoai = $duLieu['SoDienThoai'];
-        $vaiTro = $duLieu['VaiTro'];
 
         $ngaySinh = $duLieu['NgaySinh'] === ''
             ? null
             : $duLieu['NgaySinh'];
 
+        // Không cập nhật vai trò, bộ phận hoặc mã tài khoản.
         $stmt = $this->conn->prepare(
-            'UPDATE NguoiDung
+            'UPDATE nguoidung
              SET HoTen = ?,
                  Email = ?,
                  NgaySinh = ?,
-                 SoDienThoai = ?,
-                 VaiTro = ?
+                 SoDienThoai = ?
              WHERE MaTaiKhoan = ?'
         );
 
         $stmt->bind_param(
-            'ssssss',
+            'sssss',
             $hoTen,
             $email,
             $ngaySinh,
             $soDienThoai,
-            $vaiTro,
             $maTaiKhoan
         );
 
