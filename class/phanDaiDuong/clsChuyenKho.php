@@ -1,34 +1,38 @@
 <?php
 /** UC Lập yêu cầu chuyển kho - tất cả xử lý trong một file cls. */
 
-// ===== ChuyenKhoDatabase.php =====
-/** Connection helper for the transfer request feature; credentials come from .env. */
-class ChuyenKhoDatabase
+// ===== ChuyenKhoRepository.php =====
+/** Kết quả truy vấn: giữ API fetch()/fetchAll() trên kết nối mysqli dùng chung. */
+class ChuyenKhoResult
 {
-    public static function connect($c)
+    private $result;
+    public function __construct($result)
     {
-        return new PDO(
-            'mysql:host=' . $c['host'] . ';port=' . $c['port'] . ';dbname=' . $c['database'] . ';charset=utf8',
-            $c['user'],
-            $c['password'],
-            array(
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false
-            )
-        );
+        $this->result = $result;
+    }
+    public function fetch()
+    {
+        return $this->result ? ($this->result->fetch_assoc() ?: false) : false;
+    }
+    public function fetchAll()
+    {
+        return $this->result ? $this->result->fetch_all(MYSQLI_ASSOC) : [];
     }
 }
 
-// ===== ChuyenKhoRepository.php =====
-/** Parameterized SQL queries for the independent transfer request tables. */
+/** Truy vấn tham số hóa trên $conn (mysqli) từ class/common/connect.php. */
 class ChuyenKhoRepository
 {
-    public static function query($db, $sql, $params = array())
+    public static function query(mysqli $db, $sql, $params = array())
     {
-        $statement = $db->prepare($sql);
-        $statement->execute($params);
-        return $statement;
+        $stmt = $db->prepare($sql);
+        if ($params) {
+            $stmt->bind_param(str_repeat('s', count($params)), ...array_values($params));
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stmt->close();
+        return new ChuyenKhoResult($result);
     }
 }
 
@@ -73,7 +77,7 @@ class ChuyenKhoValidator
         // Khoa dong ton trong transaction de kiem tra nhat quan; khong giu cho/tru ton.
         usort($rows, fn($a, $b) => strcmp($a['maBienThe'], $b['maBienThe']));
         foreach ($rows as $r) {
-            $p = ChuyenKhoRepository::query($db, "SELECT hh.tenHangHoa, hh.donViTinh FROM BienTheHangHoa bt JOIN HangHoa hh ON hh.maHangHoa=bt.maHangHoa WHERE bt.maBienThe=? AND hh.trangThai='HOAT_DONG' AND bt.trangThai='HOAT_DONG'", [$r['maBienThe']])->fetch();
+            $p = ChuyenKhoRepository::query($db, "SELECT hh.TenHang AS tenHangHoa, hh.DonViTinh AS donViTinh FROM BienTheHangHoa bt JOIN HangHoa hh ON hh.MaHang=bt.maHangHoa WHERE bt.maBienThe=? AND hh.trangThai='HOAT_DONG' AND bt.trangThai='HOAT_DONG'", [$r['maBienThe']])->fetch();
             if (!$p)
                 throw new RuntimeException('Hàng hóa không tồn tại hoặc ngừng hoạt động.');
             if ($p['donViTinh'] === 'Cái' && floor((float) $r['soLuongChuyen']) != (float) $r['soLuongChuyen'])
@@ -98,24 +102,13 @@ function h($s){
 }
 $labels = ['NHAP' => 'Nháp', 'CHO_PHE_DUYET' => 'Chờ phê duyệt', 'DA_DUYET' => 'Đã duyệt', 'TU_CHOI' => 'Từ chối', 'DA_HUY' => 'Đã hủy'];
 $_SESSION['ck_csrf'] = $_SESSION['ck_csrf'] ?? bin2hex(random_bytes(32));
-$envPath = dirname(__DIR__, 2) . '/.env';
-if (!is_readable($envPath)) {
-    die('Không tìm thấy file .env ở thư mục gốc project.');
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    die('Chưa có kết nối database. Trang cần require class/common/connect.php trước.');
 }
-$c = parse_ini_file($envPath, false, INI_SCANNER_RAW);
-if ($c === false) {
-    die('File .env không hợp lệ.');
-}
-$c = [
-    'host' => $c['DB_HOST'] ?? 'localhost',
-    'port' => (int) ($c['DB_PORT'] ?? 3306),
-    'database' => $c['DB_NAME'] ?? 'thestars_qlkhmm_db',
-    'user' => $c['DB_USER'] ?? 'root',
-    'password' => $c['DB_PASSWORD'] ?? '',
-];
 $demoUser = ['maNguoiDung' => 'ND01', 'hoTen' => 'Phan Đại Dương', 'vaiTro' => 'QUAN_LY_KHO'];
 $error = '';
-$db = null;
+$db = $conn;
+$inTx = false;
 $user = null;
 $warehouses = [];
 $products = [];
@@ -126,7 +119,6 @@ $details = [];
 $form = ['maKhoXuat' => 'KHO01', 'maKhoNhap' => 'KHO02', 'lyDoChuyen' => ''];
 $inputRows = [['maBienThe' => '', 'soLuongChuyen' => '', 'ghiChu' => '']];
 try {
-    $db = ChuyenKhoDatabase::connect($c);
     // Người lập phiếu demo chỉ thuộc UC chuyển kho; không đọc/sửa bảng NguoiDung của module Kiểm định.
     $user = $demoUser;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -139,9 +131,10 @@ try {
                 throw new RuntimeException('Phiên thao tác hết hạn. Tải lại trang và thử lại.');
             if (!in_array($action, ['save', 'send', 'cancel'], true))
                 throw new RuntimeException('Thao tác không hợp lệ.');
-            $db->beginTransaction();
+            $db->begin_transaction();
+            $inTx = true;
             if ($id !== '') {
-                $old = ChuyenKhoRepository::query($db, 'SELECT * FROM yeucauchuyenkho WHERE maYeuCau=? FOR UPDATE', [$id])->fetch();
+                $old = ChuyenKhoRepository::query($db, 'SELECT * FROM YeuCauChuyenKho WHERE maYeuCau=? FOR UPDATE', [$id])->fetch();
                 if (!$old || $old['maNguoiLap'] !== $user['maNguoiDung'])
                     throw new RuntimeException('Không tìm thấy phiếu của bạn.');
                 if ($old['trangThai'] !== 'NHAP')
@@ -149,7 +142,7 @@ try {
             } elseif ($action === 'cancel')
                 throw new RuntimeException('Chưa chọn phiếu cần hủy.');
             if ($action === 'cancel') {
-                ChuyenKhoRepository::query($db, "UPDATE yeucauchuyenkho SET trangThai='DA_HUY' WHERE maYeuCau=?", [$id]);
+                ChuyenKhoRepository::query($db, "UPDATE YeuCauChuyenKho SET trangThai='DA_HUY' WHERE maYeuCau=?", [$id]);
             } else {
                 $rows = ChuyenKhoValidator::validateRequest($db, $form, $inputRows);
                 $state = $action === 'send' ? 'CHO_PHE_DUYET' : 'NHAP';
@@ -157,22 +150,25 @@ try {
                 if ($id === '') {
                     // 20 ky tu, random de tranh trung khi nhieu phien tao dong thoi.
                     $id = 'YCCK' . date('ymd') . strtoupper(bin2hex(random_bytes(5)));
-                    ChuyenKhoRepository::query($db, 'INSERT INTO yeucauchuyenkho(maYeuCau,maKhoXuat,maKhoNhap,maNguoiLap,lyDoChuyen,ngayLap,ngayGui,trangThai) VALUES (?,?,?,?,?,NOW(),?,?)', [$id, $form['maKhoXuat'], $form['maKhoNhap'], $user['maNguoiDung'], $form['lyDoChuyen'], $sent, $state]);
+                    ChuyenKhoRepository::query($db, 'INSERT INTO YeuCauChuyenKho(maYeuCau,maKhoXuat,maKhoNhap,maNguoiLap,lyDoChuyen,ngayLap,ngayGui,trangThai) VALUES (?,?,?,?,?,NOW(),?,?)', [$id, $form['maKhoXuat'], $form['maKhoNhap'], $user['maNguoiDung'], $form['lyDoChuyen'], $sent, $state]);
                 } else {
-                    ChuyenKhoRepository::query($db, 'UPDATE yeucauchuyenkho SET maKhoXuat=?,maKhoNhap=?,lyDoChuyen=?,ngayGui=?,trangThai=? WHERE maYeuCau=?', [$form['maKhoXuat'], $form['maKhoNhap'], $form['lyDoChuyen'], $sent, $state, $id]);
-                    ChuyenKhoRepository::query($db, 'DELETE FROM chitietyeucauchuyenkho WHERE maYeuCau=?', [$id]);
+                    ChuyenKhoRepository::query($db, 'UPDATE YeuCauChuyenKho SET maKhoXuat=?,maKhoNhap=?,lyDoChuyen=?,ngayGui=?,trangThai=? WHERE maYeuCau=?', [$form['maKhoXuat'], $form['maKhoNhap'], $form['lyDoChuyen'], $sent, $state, $id]);
+                    ChuyenKhoRepository::query($db, 'DELETE FROM ChiTietYeuCauChuyenKho WHERE maYeuCau=?', [$id]);
                 }
                 foreach ($rows as $r)
-                    ChuyenKhoRepository::query($db, 'INSERT INTO chitietyeucauchuyenkho(maYeuCau,maBienThe,soLuongChuyen,ghiChu) VALUES(?,?,?,?)', [$id, $r['maBienThe'], $r['soLuongChuyen'], $r['ghiChu']]);
+                    ChuyenKhoRepository::query($db, 'INSERT INTO ChiTietYeuCauChuyenKho(maYeuCau,maBienThe,soLuongChuyen,ghiChu) VALUES(?,?,?,?)', [$id, $r['maBienThe'], $r['soLuongChuyen'], $r['ghiChu']]);
             }
             $db->commit();
+            $inTx = false;
             $_SESSION['ck_flash'] = $action === 'cancel' ? 'Đã hủy phiếu.' : ($action === 'send' ? 'Đã gửi yêu cầu phê duyệt. Tồn kho chưa thay đổi.' : 'Đã lưu bản nháp.');
             header('Location: chitiet.php?id=' . rawurlencode($id));
             exit;
         } catch (Throwable $e) {
-            if ($db->inTransaction())
-                $db->rollBack();
-            if ($e instanceof PDOException) {
+            if ($inTx) {
+                $db->rollback();
+                $inTx = false;
+            }
+            if ($e instanceof mysqli_sql_exception) {
                 error_log($e->getMessage());
                 $error = 'Không thể lưu dữ liệu. Kiểm tra cấu trúc database và log PHP.';
             } else
@@ -180,7 +176,7 @@ try {
         }
     }
     $warehouses = ChuyenKhoRepository::query($db, "SELECT * FROM Kho WHERE trangThai='HOAT_DONG' ORDER BY maKho")->fetchAll();
-    $products = ChuyenKhoRepository::query($db, "SELECT bt.*,hh.tenHangHoa,hh.donViTinh FROM BienTheHangHoa bt JOIN HangHoa hh ON hh.maHangHoa=bt.maHangHoa WHERE hh.trangThai='HOAT_DONG' AND bt.trangThai='HOAT_DONG' ORDER BY bt.maBienThe")->fetchAll();
+    $products = ChuyenKhoRepository::query($db, "SELECT bt.*,hh.TenHang AS tenHangHoa,hh.DonViTinh AS donViTinh FROM BienTheHangHoa bt JOIN HangHoa hh ON hh.MaHang=bt.maHangHoa WHERE hh.trangThai='HOAT_DONG' AND bt.trangThai='HOAT_DONG' ORDER BY bt.maBienThe")->fetchAll();
     $stock = ChuyenKhoRepository::query($db, 'SELECT maKho,maBienThe,soLuongTon-soLuongGiuCho AS available FROM TonKho')->fetchAll();
     $view = trim((string)($_GET['id'] ?? $_GET['view'] ?? ''));
     if ($view !== '') {
@@ -193,10 +189,10 @@ try {
             $inputRows = $details;
         }
     }
-    $list = ChuyenKhoRepository::query($db, 'SELECT yc.*,kx.tenKho AS khoXuat,kn.tenKho AS khoNhap FROM yeucauchuyenkho yc JOIN Kho kx ON kx.maKho=yc.maKhoXuat JOIN Kho kn ON kn.maKho=yc.maKhoNhap WHERE yc.maNguoiLap=? ORDER BY yc.ngayLap DESC, yc.maYeuCau DESC', [$user['maNguoiDung']])->fetchAll();
+    $list = ChuyenKhoRepository::query($db, 'SELECT yc.*,kx.tenKho AS khoXuat,kn.tenKho AS khoNhap FROM YeuCauChuyenKho yc JOIN Kho kx ON kx.maKho=yc.maKhoXuat JOIN Kho kn ON kn.maKho=yc.maKhoNhap WHERE yc.maNguoiLap=? ORDER BY yc.ngayLap DESC, yc.maYeuCau DESC', [$user['maNguoiDung']])->fetchAll();
 } catch (Throwable $e) {
     error_log($e->getMessage());
-    $error = $e instanceof PDOException ? 'Không đọc được dữ liệu chuyển kho. Kiểm tra .env và kiểm tra 7 bảng mới trong thestars_qlkhmm_db.' : $e->getMessage();
+    $error = $e instanceof mysqli_sql_exception ? 'Không đọc được dữ liệu chuyển kho. Kiểm tra kết nối database (.env) và các bảng chuyển kho trong thestars_qlkhmm_db.' : $e->getMessage();
 }
 $readonly = $edit && $edit['trangThai'] !== 'NHAP';
 $flash = $_SESSION['ck_flash'] ?? '';
