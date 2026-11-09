@@ -175,7 +175,7 @@ try {
                 $error = $e->getMessage();
         }
     }
-    $warehouses = ChuyenKhoRepository::query($db, "SELECT * FROM Kho WHERE trangThai='HOAT_DONG' ORDER BY maKho")->fetchAll();
+    $warehouses = ChuyenKhoRepository::query($db, "SELECT MaKho AS maKho, TenKho AS tenKho FROM Kho WHERE trangThai='HOAT_DONG' ORDER BY MaKho")->fetchAll();
     $products = ChuyenKhoRepository::query($db, "SELECT bt.*,hh.TenHang AS tenHangHoa,hh.DonViTinh AS donViTinh FROM BienTheHangHoa bt JOIN HangHoa hh ON hh.MaHang=bt.maHangHoa WHERE hh.trangThai='HOAT_DONG' AND bt.trangThai='HOAT_DONG' ORDER BY bt.maBienThe")->fetchAll();
     $stock = ChuyenKhoRepository::query($db, 'SELECT maKho,maBienThe,soLuongTon-soLuongGiuCho AS available FROM TonKho')->fetchAll();
     $view = trim((string)($_GET['id'] ?? $_GET['view'] ?? ''));
