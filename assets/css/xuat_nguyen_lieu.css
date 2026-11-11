@@ -1,0 +1,478 @@
+/* =========================
+   LẬP YÊU CẦU XUẤT NGUYÊN LIỆU
+   ========================= */
+
+.app-main .xnl-page {
+  padding: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  color: #243247;
+}
+
+.xnl-page *,
+.xnl-page *::before,
+.xnl-page *::after {
+  box-sizing: border-box;
+}
+
+.xnl-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+}
+
+.xnl-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.xnl-title {
+  margin: 0 0 8px;
+  color: #1e293b;
+  font-size: 25px;
+  font-weight: 700;
+}
+
+.xnl-muted {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.xnl-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.xnl-search input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.xnl-page input[type="text"],
+.xnl-page input[type="number"],
+.xnl-page textarea,
+.xnl-page select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1e293b;
+  font: inherit;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.xnl-page input:focus,
+.xnl-page textarea:focus,
+.xnl-page select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.xnl-page textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.xnl-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.xnl-list-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.xnl-list-table th,
+.xnl-list-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.xnl-list-table th {
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.xnl-list-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.xnl-list-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.xnl-badge {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.xnl-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.xnl-button:hover {
+  background: #f1f5f9;
+}
+
+.xnl-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.xnl-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.xnl-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.xnl-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.xnl-info-item {
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.xnl-info-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.xnl-info-value {
+  color: #1e293b;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.xnl-form-group {
+  margin-bottom: 18px;
+}
+
+.xnl-form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.xnl-required {
+  color: #dc2626;
+}
+
+.xnl-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.xnl-error,
+.xnl-success {
+  margin-bottom: 18px;
+  padding: 12px 15px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.xnl-error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.xnl-success {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.xnl-empty {
+  padding: 25px 12px;
+  color: #64748b;
+  text-align: center;
+}
+
+.xnl-back {
+  display: inline-block;
+  margin-bottom: 18px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.xnl-back:hover {
+  text-decoration: underline;
+}
+
+.xnl-section-title {
+  margin: 0 0 16px;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .app-main .xnl-page {
+    padding: 14px;
+  }
+
+  .xnl-card {
+    padding: 16px;
+  }
+
+  .xnl-title {
+    font-size: 21px;
+  }
+
+  .xnl-info {
+    grid-template-columns: 1fr;
+  }
+
+  .xnl-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .xnl-search input {
+    min-width: 0;
+  }
+
+  .xnl-search .xnl-button {
+    width: 100%;
+  }
+}
+
+/* ===== BẢNG DANH SÁCH KẾ HOẠCH ===== */
+
+.xnl-page .xnl-card {
+  padding: 26px;
+  border: 1px solid #e5eaf1;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.xnl-page .xnl-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.xnl-page .xnl-title {
+  font-size: 25px;
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+}
+
+.xnl-page .xnl-search {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  margin: 22px 0;
+  background: #f8fafc;
+  border: 1px solid #e8edf4;
+  border-radius: 10px;
+}
+
+.xnl-page .xnl-search input {
+  flex: 1;
+  min-width: 180px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #d5deea;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.xnl-page .xnl-scroll {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.xnl-page .xnl-list-table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.xnl-page .xnl-list-table thead th {
+  padding: 16px 14px;
+  background: #edf4ff;
+  color: #334b70;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  border-bottom: 1px solid #dbe6f5;
+  white-space: nowrap;
+}
+
+.xnl-page .xnl-list-table tbody td {
+  padding: 16px 14px;
+  color: #475569;
+  font-size: 14px;
+  border-bottom: 1px solid #edf0f5;
+  vertical-align: middle;
+}
+
+.xnl-page .xnl-list-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.xnl-page .xnl-list-table tbody tr {
+  transition: background 0.2s;
+}
+
+.xnl-page .xnl-list-table tbody tr:hover {
+  background: #f7faff;
+}
+
+/* Trạng thái kế hoạch */
+
+.xnl-page .xnl-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 11px;
+  border-radius: 20px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ===== NÚT THAO TÁC ===== */
+
+.xnl-page .xnl-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid #d5deea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.xnl-page a.xnl-button:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.xnl-page .xnl-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.16);
+}
+
+.xnl-page a.xnl-primary:hover,
+.xnl-page button.xnl-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.xnl-page .xnl-search .xnl-button {
+  min-width: 100px;
+}
+
+.xnl-page .xnl-list-table td:last-child {
+  min-width: 180px;
+}
+
+.xnl-page .xnl-empty {
+  padding: 32px 16px !important;
+  color: #64748b !important;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .xnl-page .xnl-card {
+    padding: 16px;
+  }
+
+  .xnl-page .xnl-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .xnl-page .xnl-search .xnl-button {
+    width: 100%;
+  }
+}
