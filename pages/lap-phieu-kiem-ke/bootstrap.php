@@ -13,20 +13,26 @@ function kienCsrf(): string {
     return $_SESSION['kien_csrf'];
 }
 function kienVerifyCsrf(): void {
-    if (!isset($_POST['csrf']) || !hash_equals(kiemCsrfSafe(), (string)$_POST['csrf'])) {
+    if (kiemCsrfSafe() === '' || !isset($_POST['csrf']) || !hash_equals(kiemCsrfSafe(), (string)$_POST['csrf'])) {
         throw new InvalidArgumentException('Mã xác nhận không hợp lệ, hãy tải lại trang.');
     }
 }
 function kiemCsrfSafe(): string {return (string)($_SESSION['kien_csrf'] ?? '');}
 function kienLocal(): bool {return in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1','::1'], true);}
 function kienUser(clsLapPhieuKiemKe $model): array {
-    $id = (string)($_SESSION['maTaiKhoan'] ?? ($_SESSION['user']['maTaiKhoan'] ?? ''));
+    // Hợp đồng phiên đăng nhập cần thống nhất với phần đăng nhập của Kiệt.
+    $id = (string)($_SESSION['MaNguoiDung'] ?? $_SESSION['maNguoiDung'] ?? '');
+    // Chỉ bật thử nghiệm bằng KIEN_LOCAL_DEMO=1 trên WAMP; không tự cấp quyền mặc định.
+    // Tạm chạy thử trên localhost khi chưa tích hợp đăng nhập chung.
+    if ($id === '' && kienLocal()) {
+    $id = 'BKK001';
+    }
     $user = $id !== '' ? $model->nguoiDung($id) : null;
     if (!$user || !in_array($user['vaiTro'], ['BKK','Ban kiểm kê'], true)) {
         http_response_code(403);
         echo '<!doctype html><meta charset="utf-8"><title>Đăng nhập BKK</title><div style="font:16px Arial;max-width:580px;margin:70px auto;padding:24px;border:1px solid #ccc;border-radius:12px">';
         echo '<h2>Chưa đăng nhập với quyền Ban kiểm kê</h2><p>UC này yêu cầu phiên đăng nhập BKK hợp lệ.</p>';
-        if (kienLocal()) echo '<p>Để kiểm tra trên WAMP, mở <a href="dev-login.php">đăng nhập thử nghiệm localhost</a>.</p>';
+        if (kienLocal()) echo '<p>Đăng nhập chung chưa sẵn sàng: có thể bật KIEN_LOCAL_DEMO=1 trong .env để thử riêng BKK001 trên localhost.</p>';
         echo '</div>';
         exit;
     }

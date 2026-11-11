@@ -1,14 +1,11 @@
 <?php
-// Cau hinh rieng cho UC cua Kien, khong thay doi connect.php cua nhom.
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+// Dùng kết nối chung của nhóm; không tạo kết nối/config riêng.
+require_once __DIR__ . '/../../common/connect.php';
 function kienDb(): mysqli
 {
-    $file = __DIR__ . '/config.local.php';
-    if (!is_file($file)) {
-        throw new RuntimeException('Thiếu config.local.php. Hãy sao chép config.example.php rồi cấu hình WAMP.');
+    global $conn;
+    if (!($conn instanceof mysqli)) {
+        throw new RuntimeException('Kết nối chung chưa được khởi tạo.');
     }
-    $c = require $file;
-    $db = new mysqli($c['host'], $c['username'], $c['password'], $c['database'], (int)$c['port']);
-    $db->set_charset('utf8mb4');
-    return $db;
+    return $conn;
 }

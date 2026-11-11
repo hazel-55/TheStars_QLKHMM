@@ -2,7 +2,7 @@
 require __DIR__.'/bootstrap.php';
 try {
     $model=new clsLapPhieuKiemKe(kienDb());$user=kienUser($model);
-    $file=$model->tepMinhChung((int)($_GET['id']??0),$user['maTaiKhoan']);
+    $file=$model->tepMinhChung((int)($_GET['id']??0),$user['maNguoiDung']);
     if (!$file) {http_response_code(404);exit('Không thấy minh chứng.');}
     $path=$model->filePath($file['duongDanTep']);
     if (!is_file($path)) {http_response_code(404);exit('Tệp đã mất.');}

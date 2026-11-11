@@ -1,7 +1,7 @@
 <?php
 require __DIR__.'/bootstrap.php';
-try {$model=new clsLapPhieuKiemKe(kienDb());$user=kienUser($model);$sheets=$model->danhSachPhieu($user['maTaiKhoan']);}
-catch (Throwable $e) {http_response_code(500); error_log($e->getMessage());exit('Không thể tải dữ liệu kiểm kê. Kiểm tra MySQL, SQL và config.local.php.');}
+try {$model=new clsLapPhieuKiemKe(kienDb());$user=kienUser($model);$sheets=$model->danhSachPhieu($user['maNguoiDung']);}
+catch (Throwable $e) {http_response_code(500); error_log($e->getMessage());exit('Không thể tải dữ liệu kiểm kê. Kiểm tra MySQL, SQL và kết nối chung class/common/connect.php và .env.');}
 kienLayoutStart('Danh sách phiếu kiểm kê',$user,$menuConfig,$baseUrl);
 ?>
 <main class="app-main"><div class="kk-page">

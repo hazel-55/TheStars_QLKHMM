@@ -19,74 +19,81 @@ class clsLapPhieuKiemKe
     }
     public function nguoiDung(string $id): ?array
     {
-        $q = $this->db->prepare('SELECT * FROM NguoiDung WHERE maTaiKhoan=? AND trangThai=\'Hoạt động\'');
+        $q = $this->db->prepare('SELECT MaNguoiDung AS maNguoiDung, HoTen AS hoTen, VaiTro AS vaiTro FROM nguoidung WHERE MaNguoiDung=? AND HoatDong=1');
         $q->bind_param('s', $id);
         return $this->rows($q)[0] ?? null;
     }
     public function kho(): array
     {
-        return $this->db->query("SELECT maKho,tenKho,loaiKho,trangThai FROM Kho WHERE trangThai='Hoạt động' ORDER BY tenKho")->fetch_all(MYSQLI_ASSOC);
+        return $this->db->query("SELECT MaKho AS maKho,TenKho AS tenKho,LoaiKho AS loaiKho,TrangThai AS trangThai FROM kho WHERE TrangThai IN ('Hoạt động','HOAT_DONG','Hoat dong') ORDER BY TenKho")->fetch_all(MYSQLI_ASSOC);
     }
     public function layHangTon(string $maKho, bool $lock = false): array
     {
-        $sql = "SELECT tk.maBienThe, tk.maViTri, tk.soLuongTon, tk.phienBan AS phienBanTon,
-                       hh.maHangHoa, hh.tenHangHoa, hh.donViTinh, hh.kieuDang,
-                       dm.tenDanhMuc, bt.mauSac, bt.kichThuoc,
-                       vt.day,vt.ke,vt.tang
-                FROM TonKho tk
-                JOIN ViTriKho vt ON vt.maViTri=tk.maViTri
-                JOIN BienTheHangHoa bt ON bt.maBienThe=tk.maBienThe
-                JOIN HangHoa hh ON hh.maHangHoa=bt.maHangHoa
-                JOIN DanhMucHangHoa dm ON dm.maDanhMuc=hh.maDanhMuc
-                WHERE vt.maKho=? AND vt.trangThai='Hoạt động' AND hh.trangThai='Hoạt động'
-                ORDER BY hh.tenHangHoa,bt.maBienThe,vt.maViTri" . ($lock ? ' FOR UPDATE' : '');
+        $sql = "SELECT tk.maBienThe, tk.soLuongTon, COALESCE(tk.phienBan,0) AS phienBanTon,
+                       hh.MaHang AS maHangHoa, hh.TenHang AS tenHangHoa,
+                       hh.DonViTinh AS donViTinh, hh.kieuDang,
+                       COALESCE(dm.tenDanhMuc, hh.DanhMuc) AS tenDanhMuc,
+                       bt.mauSac, bt.kichThuoc
+                FROM tonkho tk
+                JOIN bienthehanghoa bt ON bt.maBienThe=tk.maBienThe
+                JOIN hanghoa hh ON hh.MaHang=bt.maHangHoa
+                LEFT JOIN danhmuchanghoa dm ON dm.maDanhMuc=hh.maDanhMuc
+                WHERE tk.maKho=?
+                ORDER BY hh.TenHang,bt.maBienThe" . ($lock ? ' FOR UPDATE' : '');
         $q = $this->db->prepare($sql);
         $q->bind_param('s', $maKho);
         $arr = [];
         foreach ($this->rows($q) as $row) {
-            $row['key'] = $row['maBienThe'] . '|' . $row['maViTri'];
+            $row['key'] = $row['maBienThe'];
             $arr[$row['key']] = $row;
         }
         return $arr;
     }
     public function danhSachPhieu(string $nguoi): array
     {
-        $q = $this->db->prepare("SELECT p.*,k.tenKho,
-                   (SELECT COUNT(*) FROM ChiTietPhieuKiemKe c WHERE c.maPhieuKiemKe=p.maPhieuKiemKe) AS soDong
-                 FROM PhieuKiemKe p JOIN Kho k ON k.maKho=p.maKho
+        $q = $this->db->prepare("SELECT p.*,k.TenKho AS tenKho,
+                   (SELECT COUNT(*) FROM chitietphieukiemke c WHERE c.maPhieuKiemKe=p.maPhieuKiemKe) AS soDong
+                 FROM phieukiemke p JOIN kho k ON k.maKho=p.maKho
                  WHERE p.maNguoiLap=? ORDER BY p.thoiGianLap DESC,p.maPhieuKiemKe DESC");
         $q->bind_param('s', $nguoi);
         return $this->rows($q);
     }
     public function layPhieu(string $ma, string $nguoi): ?array
     {
-        $q = $this->db->prepare("SELECT p.*,k.tenKho FROM PhieuKiemKe p JOIN Kho k ON k.maKho=p.maKho WHERE p.maPhieuKiemKe=? AND p.maNguoiLap=?");
+        $q = $this->db->prepare("SELECT p.*,k.TenKho AS tenKho FROM phieukiemke p JOIN kho k ON k.maKho=p.maKho WHERE p.maPhieuKiemKe=? AND p.maNguoiLap=?");
         $q->bind_param('ss', $ma, $nguoi);
         $p = $this->rows($q)[0] ?? null;
         if (!$p) return null;
-        $q = $this->db->prepare('SELECT * FROM ChiTietPhieuKiemKe WHERE maPhieuKiemKe=? ORDER BY maChiTiet');
+        $q = $this->db->prepare('SELECT c.*, hh.MaHang AS maHangHoa, hh.TenHang AS tenHangHoa,
+            hh.DonViTinh AS donViTinh, hh.kieuDang, COALESCE(dm.tenDanhMuc,hh.DanhMuc) AS tenDanhMuc,
+            bt.mauSac, bt.kichThuoc, c.soLuongTonHeThong AS soLuongTon,
+            c.phienBanTonLucChot AS phienBanTon
+            FROM chitietphieukiemke c JOIN bienthehanghoa bt ON bt.maBienThe=c.maBienThe
+            JOIN hanghoa hh ON hh.MaHang=bt.maHangHoa
+            LEFT JOIN danhmuchanghoa dm ON dm.maDanhMuc=hh.maDanhMuc
+            WHERE c.maPhieuKiemKe=? ORDER BY c.maChiTiet');
         $q->bind_param('s', $ma);
         $details = [];
         foreach ($this->rows($q) as $r) {
-            $r['key'] = $r['maBienThe'] . '|' . $r['maViTri'];
+            $r['key'] = $r['maBienThe'];
             $details[$r['key']] = $r;
         }
         $p['chiTiet'] = $details;
         $q = $this->db->prepare("SELECT m.maMinhChung,m.maChiTiet,m.tenMinhChung,m.loaiMinhChung
-                  FROM MinhChungKiemKe m JOIN ChiTietPhieuKiemKe c ON c.maChiTiet=m.maChiTiet
+                  FROM minhchungkiemke m JOIN chitietphieukiemke c ON c.maChiTiet=m.maChiTiet
                   WHERE c.maPhieuKiemKe=? ORDER BY m.maMinhChung");
         $q->bind_param('s', $ma);
         $minhChung = [];
         foreach ($this->rows($q) as $r) $minhChung[(string)$r['maChiTiet']][] = $r;
         $p['minhChung'] = $minhChung;
-        $q = $this->db->prepare('SELECT maBienBan, noiDungGiaiTrinh FROM BienBanGiaiTrinh WHERE maPhieuKiemKe=?');
+        $q = $this->db->prepare('SELECT maBienBan, noiDungGiaiTrinh FROM bienbangiaitrinh WHERE maPhieuKiemKe=?');
         $q->bind_param('s', $ma);
         $p['bienBan'] = $this->rows($q)[0] ?? null;
         return $p;
     }
     private function soLuong($v, bool $allowBlank): ?int
     {
-        return kienDocSoNguyen($v, $allowBlank);
+        return kienDocSoLuong($v, $allowBlank);
     }
     private function text($v, int $limit, string $name): string
     {
@@ -100,14 +107,14 @@ class clsLapPhieuKiemKe
     {
         // Thuc thi trong transaction; SELECT FOR UPDATE khoa bo dem theo nam.
         $year = (int)date('y');
-        $q = $this->db->prepare('INSERT IGNORE INTO KiemKeSoThuTu(nam,soCuoi) VALUES (?,0)');
+        $q = $this->db->prepare('INSERT IGNORE INTO kiemkesothutu(nam,soCuoi) VALUES (?,0)');
         $q->bind_param('i', $year); $q->execute();
-        $q = $this->db->prepare('SELECT soCuoi FROM KiemKeSoThuTu WHERE nam=? FOR UPDATE');
+        $q = $this->db->prepare('SELECT soCuoi FROM kiemkesothutu WHERE nam=? FOR UPDATE');
         $q->bind_param('i', $year);
         $last = (int)$this->rows($q)[0]['soCuoi'];
         if ($last >= 9999) throw new RuntimeException('Đã hết mã phiếu trong năm.');
         $next = $last+1;
-        $q = $this->db->prepare('UPDATE KiemKeSoThuTu SET soCuoi=? WHERE nam=?');
+        $q = $this->db->prepare('UPDATE kiemkesothutu SET soCuoi=? WHERE nam=?');
         $q->bind_param('ii', $next, $year); $q->execute();
         return 'PKK' . str_pad((string)$year,2,'0',STR_PAD_LEFT) . str_pad((string)$next,4,'0',STR_PAD_LEFT);
     }
@@ -167,32 +174,37 @@ class clsLapPhieuKiemKe
         $newFiles = []; $oldFiles = [];
         $this->db->begin_transaction();
         try {
-            $q = $this->db->prepare("SELECT maKho FROM Kho WHERE maKho=? AND trangThai='Hoạt động' FOR UPDATE");
+            $q = $this->db->prepare("SELECT maKho FROM kho WHERE maKho=? AND TrangThai IN ('Hoạt động','HOAT_DONG','Hoat dong') FOR UPDATE");
             $q->bind_param('s', $maKho);
-            if (!$this->rows($q)) throw new InvalidArgumentException('Kho không tồn tại hoặc đã ngừng hoạt động.');
+            if (!$this->rows($q)) throw new InvalidArgumentException('kho không tồn tại hoặc đã ngừng hoạt động.');
             $oldDetails = [];
             if ($ma !== '') {
-                $q = $this->db->prepare('SELECT maPhieuKiemKe,maKho,maNguoiLap,trangThai,phienBan FROM PhieuKiemKe WHERE maPhieuKiemKe=? FOR UPDATE');
+                $q = $this->db->prepare('SELECT maPhieuKiemKe,maKho,maNguoiLap,trangThai,phienBan FROM phieukiemke WHERE maPhieuKiemKe=? FOR UPDATE');
                 $q->bind_param('s',$ma); $old = $this->rows($q)[0] ?? null;
                 if (!$old || $old['maNguoiLap'] !== $userId) throw new InvalidArgumentException('Không tìm thấy phiếu thuộc quyền của bạn.');
                 if ($old['trangThai'] !== 'Nháp') throw new InvalidArgumentException('Phiếu đã gửi, không được sửa.');
                 if ($old['maKho'] !== $maKho) throw new InvalidArgumentException('Không thể đổi kho của bản nháp hiện tại.');
                 if ((int)$old['phienBan'] !== (int)($form['phienBan'] ?? 0)) throw new InvalidArgumentException('Phiếu đã được thay đổi ở phiên khác. Hãy tải lại trang.');
-                $q=$this->db->prepare('SELECT * FROM ChiTietPhieuKiemKe WHERE maPhieuKiemKe=? FOR UPDATE');
+                $q=$this->db->prepare('SELECT * FROM chitietphieukiemke WHERE maPhieuKiemKe=? FOR UPDATE');
                 $q->bind_param('s',$ma);
-                foreach ($this->rows($q) as $r) $oldDetails[$r['maBienThe'].'|'.$r['maViTri']]=$r;
+                foreach ($this->rows($q) as $r) $oldDetails[$r['maBienThe']]=$r;
             }
             $inventory = $this->layHangTon($maKho, true);
             $checked = [];
             $canGiaiTrinh = false;
             foreach ($selected as $key=>$r) {
-                if (!isset($inventory[$key])) throw new InvalidArgumentException('Hàng / vị trí không thuộc kho hoặc không còn hoạt động: '.$key);
+                if (!isset($inventory[$key])) throw new InvalidArgumentException('Biến thể không có tồn kho trong kho đã chọn: '.$key);
                 $item = $inventory[$key];
                 $oldR = $oldDetails[$key] ?? null;
-                $ver = (int)($oldR['phienBanTonLucChot'] ?? ($r['phienBanTonLucChot'] ?? 0));
-                if ($ver < 1) throw new InvalidArgumentException('Thiếu phiên bản tồn kho, vui lòng tải lại trang.');
+                $ver = (int)($oldR['phienBanTonLucChot'] ?? ($r['phienBanTonLucChot'] ?? -1));
+                if ($ver < 0) throw new InvalidArgumentException('Thiếu phiên bản tồn kho, vui lòng tải lại trang.');
                 if (!$oldR && $ver !== (int)$item['phienBanTon']) throw new InvalidArgumentException('Tồn kho đã thay đổi, hãy tải lại trang và kiểm kê lại: '.$key);
                 if ($send && $ver !== (int)$item['phienBanTon']) throw new InvalidArgumentException('Tồn kho thay đổi sau khi chốt; không thể gửi phiếu: '.$key);
+                $currentStock = kienDocSoLuong($item['soLuongTon']);
+                $expectedStock = kienDocSoLuong($oldR ? $oldR['soLuongTonHeThong'] : ($r['tonLucHienThi'] ?? null));
+                if ((!$oldR || $send) && $currentStock !== $expectedStock) {
+                    throw new InvalidArgumentException('Số tồn đã thay đổi; cần tải lại và kiểm kê lại. Với phiếu nháp cũ, hãy lập phiếu mới: '.$key);
+                }
                 $actual = $this->soLuong($r['soLuongThucTe'] ?? null, !$send);
                 $destroyed = $this->soLuong($r['soLuongHangLoiTieuHuy'] ?? '0', false);
                 $destroyed = $destroyed ?? 0;
@@ -202,10 +214,7 @@ class clsLapPhieuKiemKe
                 $whyDestroy = $this->text($r['lyDoTieuHuy'] ?? '',500,'Lý do tiêu hủy');
                 $howDestroy = $this->text($r['hinhThucTieuHuy'] ?? '',255,'Hình thức tiêu hủy');
                 $explain = $this->text($r['noiDungGiaiTrinh'] ?? '',2000,'Giải trình');
-                $snapshot = kienDocSoNguyen($oldR ? (string)(int)$oldR['soLuongTonHeThong'] : (string)(int)$item['soLuongTon']);
-                // Nếu có tồn kho dạng số lẻ từ dữ liệu cũ: dừng, không âm thầm làm tròn.
-                $sourceStock = $oldR ? $oldR['soLuongTonHeThong'] : $item['soLuongTon'];
-                if ((float)$sourceStock !== (float)$snapshot) throw new InvalidArgumentException('Tồn kho có số thập phân; không thể lập phiếu số nguyên cho SKU '.$key);
+                $snapshot = kienDocSoLuong($oldR ? $oldR['soLuongTonHeThong'] : $item['soLuongTon']);
                 $total = ($actual === null) ? null : kienTinhTon($snapshot, $actual, $destroyed);
                 if ($total !== null && ($total['chenhLech'] !== 0 || $destroyed > 0)) $canGiaiTrinh = true;
                 if ($send) {
@@ -215,13 +224,11 @@ class clsLapPhieuKiemKe
                     if (($total['chenhLech'] != 0 || $destroyed > 0) && $explain === '') throw new InvalidArgumentException('Phải nhập nội dung giải trình: '.$key);
                 }
                 $checked[$key] = [
-                    'maBienThe'=>$item['maBienThe'],'maViTri'=>$item['maViTri'],
-                    'snapshot'=>$snapshot,'version'=>$ver,
-                    'actual'=>$actual===null ? null : (string)$actual,
+                    'maBienThe'=>$item['maBienThe'],
+                    'snapshot'=>kienSoLuongSql($snapshot),'version'=>$ver,
+                    'actual'=>$actual===null ? null : kienSoLuongSql($actual),
                     'condition'=>$condition ?: null,
-                    'destroyed'=>(string)$destroyed,
-                    'remaining'=>$total===null ? null : (string)$total['conLai'],
-                    'difference'=>$total===null ? null : (string)$total['chenhLech'],
+                    'destroyed'=>kienSoLuongSql($destroyed),
                     'why'=>$why ?: null,'whyDestroy'=>$whyDestroy ?: null,
                     'howDestroy'=>$howDestroy ?: null,'explain'=>$explain ?: null,
                     'oldId'=>$oldR['maChiTiet'] ?? null
@@ -230,7 +237,7 @@ class clsLapPhieuKiemKe
             if ($send && $canGiaiTrinh && $giaiTrinhTongThe === '') throw new InvalidArgumentException('Cần nhập biên bản giải trình tổng thể khi phiếu có thừa, thiếu hoặc tiêu hủy.');
             if ($ma === '') {
                 $ma=$this->taoMaPhieu();
-                $q=$this->db->prepare("INSERT INTO PhieuKiemKe(maPhieuKiemKe,maKho,maNguoiLap,ghiChu,trangThai) VALUES(?,?,?,?,'Nháp')");
+                $q=$this->db->prepare("INSERT INTO phieukiemke(maPhieuKiemKe,maKho,maNguoiLap,ghiChu,trangThai) VALUES(?,?,?,?,'Nháp')");
                 $q->bind_param('ssss',$ma,$maKho,$userId,$ghichu); $q->execute();
             }
             foreach ($checked as $key=>$r) {
@@ -238,12 +245,12 @@ class clsLapPhieuKiemKe
                 $why=$r['why'];$whyDes=$r['whyDestroy'];$howDes=$r['howDestroy'];$explain=$r['explain'];
                 if ($r['oldId'] !== null) {
                     $id=(string)$r['oldId'];
-                    $q=$this->db->prepare('UPDATE ChiTietPhieuKiemKe SET soLuongThucTe=?,tinhTrangHangHoa=?,soLuongHangLoiTieuHuy=?,lyDoChenhLech=?,lyDoTieuHuy=?,hinhThucTieuHuy=?,noiDungGiaiTrinh=? WHERE maChiTiet=?');
+                    $q=$this->db->prepare('UPDATE chitietphieukiemke SET soLuongThucTe=?,tinhTrangHangHoa=?,soLuongHangLoiTieuHuy=?,lyDoChenhLech=?,lyDoTieuHuy=?,hinhThucTieuHuy=?,noiDungGiaiTrinh=? WHERE maChiTiet=?');
                     $q->bind_param('ssssssss',$a,$c,$d,$why,$whyDes,$howDes,$explain,$id);$q->execute();
                 } else {
-                    $bt=$r['maBienThe'];$vt=$r['maViTri'];$stock=(string)$r['snapshot'];$version=(string)$r['version'];
-                    $q=$this->db->prepare('INSERT INTO ChiTietPhieuKiemKe(maPhieuKiemKe,maBienThe,maViTri,soLuongTonHeThong,thoiDiemChotTon,phienBanTonLucChot,soLuongThucTe,tinhTrangHangHoa,soLuongHangLoiTieuHuy,lyDoChenhLech,lyDoTieuHuy,hinhThucTieuHuy,noiDungGiaiTrinh) VALUES(?,?,?,?,NOW(),?,?,?,?,?,?,?,?)');
-                    $q->bind_param('ssssssssssss',$ma,$bt,$vt,$stock,$version,$a,$c,$d,$why,$whyDes,$howDes,$explain);$q->execute();
+                    $bt=$r['maBienThe'];$stock=(string)$r['snapshot'];$version=(string)$r['version'];
+                    $q=$this->db->prepare('INSERT INTO chitietphieukiemke(maPhieuKiemKe,maBienThe,soLuongTonHeThong,thoiDiemChotTon,phienBanTonLucChot,soLuongThucTe,tinhTrangHangHoa,soLuongHangLoiTieuHuy,lyDoChenhLech,lyDoTieuHuy,hinhThucTieuHuy,noiDungGiaiTrinh) VALUES(?,?,?,NOW(),?,?,?,?,?,?,?,?)');
+                    $q->bind_param('sssssssssss',$ma,$bt,$stock,$version,$a,$c,$d,$why,$whyDes,$howDes,$explain);$q->execute();
                     $id=(string)$this->db->insert_id;
                 }
                 foreach ($uploads[$key] ?? [] as $file) {
@@ -253,41 +260,41 @@ class clsLapPhieuKiemKe
                     if (!move_uploaded_file($file['tmp'],$full)) throw new RuntimeException('Không lưu được tệp minh chứng.');
                     $newFiles[]=$full;
                     $name=$file['name'];$type=$file['type'];$size=(string)$file['size'];
-                    $q=$this->db->prepare('INSERT INTO MinhChungKiemKe(maChiTiet,tenMinhChung,loaiMinhChung,duongDanTep,kichThuocTep,maNguoiDinhKem) VALUES(?,?,?,?,?,?)');
+                    $q=$this->db->prepare('INSERT INTO minhchungkiemke(maChiTiet,tenMinhChung,loaiMinhChung,duongDanTep,kichThuocTep,maNguoiDinhKem) VALUES(?,?,?,?,?,?)');
                     $q->bind_param('ssssss',$id,$name,$type,$filename,$size,$userId);$q->execute();
                 }
             }
             foreach ($oldDetails as $key=>$r) {
                 if (isset($checked[$key])) continue;
                 $id=(string)$r['maChiTiet'];
-                $q=$this->db->prepare('SELECT duongDanTep FROM MinhChungKiemKe WHERE maChiTiet=?');
+                $q=$this->db->prepare('SELECT duongDanTep FROM minhchungkiemke WHERE maChiTiet=?');
                 $q->bind_param('s',$id);
                 foreach ($this->rows($q) as $file) $oldFiles[]=basename($file['duongDanTep']);
-                $q=$this->db->prepare('DELETE FROM ChiTietPhieuKiemKe WHERE maChiTiet=?');
+                $q=$this->db->prepare('DELETE FROM chitietphieukiemke WHERE maChiTiet=?');
                 $q->bind_param('s',$id);$q->execute();
             }
             // Biên bản giải trình được lưu cùng transaction với phiếu.
             if ($giaiTrinhTongThe !== '') {
                 $maBienBan = 'BBGT' . substr($ma, 3);
-                $q=$this->db->prepare('INSERT INTO BienBanGiaiTrinh(maBienBan,maPhieuKiemKe,maNguoiLap,noiDungGiaiTrinh) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE noiDungGiaiTrinh=VALUES(noiDungGiaiTrinh)');
+                $q=$this->db->prepare('INSERT INTO bienbangiaitrinh(maBienBan,maPhieuKiemKe,maNguoiLap,noiDungGiaiTrinh) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE noiDungGiaiTrinh=VALUES(noiDungGiaiTrinh)');
                 $q->bind_param('ssss',$maBienBan,$ma,$userId,$giaiTrinhTongThe);$q->execute();
             } else {
-                $q=$this->db->prepare('DELETE FROM BienBanGiaiTrinh WHERE maPhieuKiemKe=?');
+                $q=$this->db->prepare('DELETE FROM bienbangiaitrinh WHERE maPhieuKiemKe=?');
                 $q->bind_param('s',$ma);$q->execute();
             }
             if ($send) {
-                $q=$this->db->prepare("SELECT maTaiKhoan FROM NguoiDung WHERE vaiTro IN ('BGD','BGĐ','Ban giám đốc') AND trangThai='Hoạt động'");
+                $q=$this->db->prepare("SELECT MaNguoiDung FROM nguoidung WHERE VaiTro IN ('BGD','BGĐ','Ban giám đốc') AND HoatDong=1");
                 $directors=$this->rows($q);
                 if (!$directors) throw new InvalidArgumentException('Chưa có BGĐ hoạt động để nhận thông báo.');
-                $q=$this->db->prepare("UPDATE PhieuKiemKe SET ghiChu=?,trangThai='Chờ phê duyệt',maNguoiGui=?,thoiGianGui=NOW(),phienBan=phienBan+1 WHERE maPhieuKiemKe=?");
+                $q=$this->db->prepare("UPDATE phieukiemke SET ghiChu=?,trangThai='Chờ phê duyệt',maNguoiGui=?,thoiGianGui=NOW(),phienBan=phienBan+1 WHERE maPhieuKiemKe=?");
                 $q->bind_param('sss',$ghichu,$userId,$ma);$q->execute();
                 foreach ($directors as $director) {
-                    $recipient=$director['maTaiKhoan'];$message='Phiếu kiểm kê '.$ma.' đang chờ phê duyệt.';
-                    $q=$this->db->prepare('INSERT INTO ThongBaoKiemKe(maPhieuKiemKe,maNguoiNhan,noiDung) VALUES(?,?,?)');
+                    $recipient=$director['MaNguoiDung'];$message='Phiếu kiểm kê '.$ma.' đang chờ phê duyệt.';
+                    $q=$this->db->prepare('INSERT INTO thongbaokiemke(maPhieuKiemKe,maNguoiNhan,noiDung) VALUES(?,?,?)');
                     $q->bind_param('sss',$ma,$recipient,$message);$q->execute();
                 }
             } else {
-                $q=$this->db->prepare('UPDATE PhieuKiemKe SET ghiChu=?,phienBan=phienBan+1 WHERE maPhieuKiemKe=?');
+                $q=$this->db->prepare('UPDATE phieukiemke SET ghiChu=?,phienBan=phienBan+1 WHERE maPhieuKiemKe=?');
                 $q->bind_param('ss',$ghichu,$ma);$q->execute();
             }
             $this->db->commit();
@@ -303,14 +310,14 @@ class clsLapPhieuKiemKe
     {
         $this->db->begin_transaction();
         try {
-            $q=$this->db->prepare('SELECT trangThai,phienBan,maNguoiLap FROM PhieuKiemKe WHERE maPhieuKiemKe=? FOR UPDATE');
+            $q=$this->db->prepare('SELECT trangThai,phienBan,maNguoiLap FROM phieukiemke WHERE maPhieuKiemKe=? FOR UPDATE');
             $q->bind_param('s',$ma); $p=$this->rows($q)[0]??null;
             if (!$p || $p['maNguoiLap']!==$owner || $p['trangThai']!=='Nháp' || (int)$p['phienBan']!==$version) {
                 throw new InvalidArgumentException('Chỉ được xóa bản nháp của mình và đúng phiên bản.');
             }
-            $q=$this->db->prepare('SELECT m.duongDanTep FROM MinhChungKiemKe m JOIN ChiTietPhieuKiemKe c ON c.maChiTiet=m.maChiTiet WHERE c.maPhieuKiemKe=?');
+            $q=$this->db->prepare('SELECT m.duongDanTep FROM minhchungkiemke m JOIN chitietphieukiemke c ON c.maChiTiet=m.maChiTiet WHERE c.maPhieuKiemKe=?');
             $q->bind_param('s',$ma);$files=$this->rows($q);
-            $q=$this->db->prepare('DELETE FROM PhieuKiemKe WHERE maPhieuKiemKe=?');
+            $q=$this->db->prepare('DELETE FROM phieukiemke WHERE maPhieuKiemKe=?');
             $q->bind_param('s',$ma);$q->execute();
             $this->db->commit();
             foreach ($files as $f) @unlink($this->storageDir.'/'.basename($f['duongDanTep']));
@@ -318,7 +325,7 @@ class clsLapPhieuKiemKe
     }
     public function tepMinhChung(int $id,string $owner): ?array
     {
-        $q=$this->db->prepare('SELECT m.* FROM MinhChungKiemKe m JOIN ChiTietPhieuKiemKe c ON c.maChiTiet=m.maChiTiet JOIN PhieuKiemKe p ON p.maPhieuKiemKe=c.maPhieuKiemKe WHERE m.maMinhChung=? AND p.maNguoiLap=?');
+        $q=$this->db->prepare('SELECT m.* FROM minhchungkiemke m JOIN chitietphieukiemke c ON c.maChiTiet=m.maChiTiet JOIN phieukiemke p ON p.maPhieuKiemKe=c.maPhieuKiemKe WHERE m.maMinhChung=? AND p.maNguoiLap=?');
         $q->bind_param('is',$id,$owner); return $this->rows($q)[0]??null;
     }
     public function filePath(string $filename): string {return $this->storageDir.'/'.basename($filename);}

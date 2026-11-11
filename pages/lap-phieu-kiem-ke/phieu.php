@@ -6,7 +6,7 @@ try {
 } catch (Throwable $e) {
     http_response_code(500);
     error_log($e->getMessage());
-    exit('Không kết nối được CSDL kiểm kê. Kiểm tra WAMP, SQL và config.local.php.');
+    exit('Không kết nối được CSDL kiểm kê. Kiểm tra WAMP, SQL và kết nối chung class/common/connect.php và .env.');
 }
 
 $error = '';
@@ -15,13 +15,13 @@ $ma = trim((string)($_GET['ma'] ?? $_POST['maPhieu'] ?? ''));
 $phieu = null;
 try {
     if ($ma !== '') {
-        $phieu = $model->layPhieu($ma, $user['maTaiKhoan']);
+        $phieu = $model->layPhieu($ma, $user['maNguoiDung']);
         if ($phieu === null) throw new InvalidArgumentException('Phiếu không tồn tại hoặc không thuộc quyền của bạn.');
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         kienVerifyCsrf();
         if ($phieu !== null && $phieu['trangThai'] !== 'Nháp') throw new InvalidArgumentException('Phiếu đã gửi, không thể sửa.');
-        $id = $model->luu($user['maTaiKhoan'], $_POST);
+        $id = $model->luu($user['maNguoiDung'], $_POST);
         $status = ($_POST['hanhDong'] ?? '') === 'gui' ? 'gui' : 'nhap';
         header('Location: index.php?ok=' . $status . '&ma=' . rawurlencode($id));
         exit;
@@ -43,6 +43,7 @@ if ($chosenKho !== '') {
     catch (Throwable $e) {error_log($e->getMessage()); $error = $error ?: 'Không lấy được hàng hóa trong kho đã chọn.';}
 }
 $previous = $phieu['chiTiet'] ?? [];
+$goods = $readonly ? $previous : ($goods + $previous);
 $postedItems = is_array($submitted['items'] ?? null) ? $submitted['items'] : [];
 $totalSelected = 0;
 foreach ($goods as $k => $r) {
@@ -77,9 +78,9 @@ kienLayoutStart($title, $user, $menuConfig, $baseUrl);
     <input type="hidden" name="phienBan" value="<?= (int)($phieu['phienBan']??0) ?>">
     <section class="kk-card">
       <div class="kk-card-head"><h2>2. Hàng hóa và kết quả kiểm kê</h2><span><?=count($goods)?> dòng tồn kho</span></div>
-      <div class="kk-help">Chỉ nhập số nguyên, không dùng dấu thập phân. Có thể nhập 1250 hoặc 1 250; hệ thống hiển thị dấu cách phân cách hàng nghìn. Chọn từng biến thể tại đúng vị trí cần kiểm kê. <strong>Số thực tế</strong> là số kiểm đếm trước tiêu hủy. Chênh lệch = (thực tế − tiêu hủy) − tồn hệ thống.</div>
-      <div class="kk-toolbar"><label class="kk-search-label" for="kk-search">Tìm hàng <input id="kk-search" type="search" placeholder="Mã SKU, tên, màu, size, vị trí..." autocomplete="off"></label><span id="kk-visible-count"></span><span>Đã chọn: <b id="selected-count"><?=$totalSelected?></b> dòng</span><button type="button" class="kk-btn kk-small" id="select-all" <?=$readonly?'disabled':''?>>Chọn tất cả</button></div>
-      <div class="kk-scroll"><table class="kk-table kk-goods"><thead><tr><th>Chọn</th><th>Hàng hóa / SKU</th><th>Danh mục / Kiểu dáng</th><th>Màu / Size</th><th>Vị trí</th><th>Tồn hệ thống</th><th>Thực tế</th><th>Tiêu hủy</th><th>Còn lại</th><th>Chênh lệch</th></tr></thead>
+      <div class="kk-help">Nhập số không âm, tối đa 3 chữ số thập phân, dùng dấu chấm (ví dụ 1250.125). Mỗi biến thể là một dòng trong kho. <strong>Số thực tế</strong> là số kiểm đếm trước tiêu hủy. Chênh lệch = (thực tế − tiêu hủy) − tồn hệ thống.</div>
+      <div class="kk-toolbar"><label class="kk-search-label" for="kk-search">Tìm hàng <input id="kk-search" type="search" placeholder="Mã SKU, tên, màu, size..." autocomplete="off"></label><span id="kk-visible-count"></span><span>Đã chọn: <b id="selected-count"><?=$totalSelected?></b> dòng</span><button type="button" class="kk-btn kk-small" id="select-all" <?=$readonly?'disabled':''?>>Chọn tất cả</button></div>
+      <div class="kk-scroll"><table class="kk-table kk-goods"><thead><tr><th>Chọn</th><th>Hàng hóa / SKU</th><th>Danh mục / Kiểu dáng</th><th>Màu / Size</th><th>Tồn hệ thống</th><th>Thực tế</th><th>Tiêu hủy</th><th>Còn lại</th><th>Chênh lệch</th></tr></thead>
       <tbody>
       <?php foreach ($goods as $key=>$g):
         $v = $postedItems[$key] ?? ($previous[$key] ?? []);
@@ -96,14 +97,14 @@ kienLayoutStart($title, $user, $menuConfig, $baseUrl);
           <td><b><?=kienH($g['tenHangHoa'])?></b><small><?=kienH($g['maHangHoa'].' / '.$g['maBienThe'])?></small></td>
           <td><?=kienH($g['tenDanhMuc'])?><small><?=kienH($g['kieuDang']?:'—')?></small></td>
           <td><?=kienH($g['mauSac']?:'—')?> / <?=kienH($g['kichThuoc']?:'—')?></td>
-          <td><?=kienH($g['day'].' / '.$g['ke'].' / T'.$g['tang'])?><small><?=kienH($g['maViTri'])?></small></td>
           <td class="kk-num"><?=kienH(kienDinhDangSo($previous[$key]['soLuongTonHeThong']??$g['soLuongTon']))?> <?=kienH($g['donViTinh'])?></td>
-          <td><input class="kk-number kk-actual" type="text" inputmode="numeric" maxlength="15" pattern="[0-9 ]*" name="items[<?=kienH($key)?>][soLuongThucTe]" value="<?=kienH($actual)?>" <?=$readonly?'disabled':''?> placeholder="Nhập số"></td>
-          <td><input class="kk-number kk-destroyed" type="text" inputmode="numeric" maxlength="15" pattern="[0-9 ]*" name="items[<?=kienH($key)?>][soLuongHangLoiTieuHuy]" value="<?=kienH($destroyed)?>" <?=$readonly?'disabled':''?>></td>
+          <td><input class="kk-number kk-actual" type="text" inputmode="decimal" maxlength="23" name="items[<?=kienH($key)?>][soLuongThucTe]" value="<?=kienH($actual)?>" <?=$readonly?'disabled':''?> placeholder="Nhập số"></td>
+          <td><input class="kk-number kk-destroyed" type="text" inputmode="decimal" maxlength="23" name="items[<?=kienH($key)?>][soLuongHangLoiTieuHuy]" value="<?=kienH($destroyed)?>" <?=$readonly?'disabled':''?>></td>
           <td class="kk-num kk-remaining">—</td><td class="kk-num kk-difference">—</td>
         </tr>
-        <tr class="kk-expanded <?=$isSelected?'is-visible':''?>"><td colspan="10">
+        <tr class="kk-expanded <?=$isSelected?'is-visible':''?>"><td colspan="9">
            <input type="hidden" name="items[<?=kienH($key)?>][phienBanTonLucChot]" value="<?=kienH($rowVersion)?>">
+           <input type="hidden" name="items[<?=kienH($key)?>][tonLucHienThi]" value="<?=kienH($previous[$key]['soLuongTonHeThong']??$g['soLuongTon'])?>">
            <div class="kk-fields">
              <label>Tình trạng hàng hóa <span>* khi gửi</span><input type="text" maxlength="255" name="items[<?=kienH($key)?>][tinhTrangHangHoa]" value="<?=kienH($v['tinhTrangHangHoa']??'')?>" placeholder="Ví dụ: còn nguyên vẹn / hư hỏng" <?=$readonly?'disabled':''?>></label>
              <label>Lý do chênh lệch <span>* nếu thừa / thiếu</span><textarea maxlength="500" name="items[<?=kienH($key)?>][lyDoChenhLech]" rows="2" <?=$readonly?'disabled':''?>><?=kienH($v['lyDoChenhLech']??'')?></textarea></label>
@@ -128,8 +129,8 @@ kienLayoutStart($title, $user, $menuConfig, $baseUrl);
       <?php if(!$readonly): ?><div class="kk-action-bar"><button class="kk-btn" type="submit" name="hanhDong" value="nhap">Lưu bản nháp</button><button class="kk-btn kk-primary" type="submit" name="hanhDong" value="gui" id="send-btn" onclick="return confirm('Gửi phiếu tới Ban giám đốc? Sau khi gửi sẽ không thể sửa phiếu.');">Gửi phê duyệt →</button></div><?php endif; ?>
     </section>
   </form>
-  <?php elseif ($chosenKho !== ''): ?><div class="kk-alert info">Kho này chưa có tồn kho hoạt động để kiểm kê. Chọn kho khác hoặc thêm dữ liệu mẫu trong CSDL thử nghiệm.</div>
+  <?php elseif ($chosenKho !== ''): ?><div class="kk-alert info">Kho này chưa có tồn kho hoạt động để kiểm kê. Vui lòng chọn kho khác.</div>
   <?php else: ?><div class="kk-alert info">Bắt đầu bằng việc chọn một kho hoạt động để tải danh sách hàng hóa.</div><?php endif; ?>
 </div></main>
-<script src="<?=kienH($baseUrl.'/assets/js/lap-phieu-kiem-ke.js?v=1')?>" defer></script>
+<script src="<?=kienH($baseUrl.'/assets/js/lap-phieu-kiem-ke.js?v=2')?>" defer></script>
 <?php renderFooter(); ?>

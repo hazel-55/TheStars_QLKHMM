@@ -1,30 +1,33 @@
 <?php
-/** Các số lượng kiểm kê chỉ dùng số nguyên không âm (đơn vị cơ bản của từng SKU). */
-function kienDocSoNguyen($value, bool $allowBlank = false): ?int
+/** Số lượng được tính bằng số nguyên phần nghìn để tránh sai số float. PHP 64-bit. */
+function kienDocSoLuong($value, bool $allowBlank = false): ?int
 {
     if ($value === null || trim((string)$value) === '') {
         if ($allowBlank) return null;
         throw new InvalidArgumentException('Chưa nhập số lượng của hàng đã chọn.');
     }
+    if (!is_scalar($value)) throw new InvalidArgumentException('Số lượng không hợp lệ.');
     $raw = trim((string)$value);
-    // Cho phép 1234 hoặc 1 234 hoặc 1 234 567; KHÔNG nhận dấu chấm/phẩy thập phân.
-    $raw = str_replace(["\xc2\xa0", "\xe2\x80\xaf"], ' ', $raw);
-    if (!preg_match('/^(?:[0-9]{1,12}|[0-9]{1,3}(?: [0-9]{3}){1,3})$/D', $raw)) {
-        throw new InvalidArgumentException('Chỉ nhập số nguyên không âm, ví dụ: 1200 hoặc 1 200.');
+    if (!preg_match('/^([0-9]{1,15}|[0-9]{1,3}(?: [0-9]{3}){1,4})(?:\.([0-9]{1,3}))?$/D', $raw, $m)) {
+        throw new InvalidArgumentException('Nhập số không âm, tối đa 3 chữ số thập phân; dùng dấu chấm, ví dụ 1250.125.');
     }
-    $clean = str_replace(' ', '', $raw);
-    if (strlen($clean) > 12 || (float)$clean > 999999999999) {
-        throw new InvalidArgumentException('Số lượng vượt giới hạn 999 999 999 999.');
-    }
-    return (int)$clean;
+    if (PHP_INT_SIZE < 8) throw new RuntimeException('Cần PHP 64-bit.');
+    return (int)str_replace(' ', '', $m[1]) * 1000 + (int)str_pad($m[2] ?? '', 3, '0');
+}
+function kienSoLuongSql(int $milli): string
+{
+    $sign = $milli < 0 ? '-' : '';
+    $n = abs($milli);
+    return $sign . intdiv($n, 1000) . '.' . str_pad((string)($n % 1000), 3, '0', STR_PAD_LEFT);
 }
 function kienDinhDangSo($value): string
 {
     if ($value === null || $value === '') return '';
-    if (!is_numeric($value) || floor((float)$value) !== (float)$value) {
-        throw new InvalidArgumentException('Dữ liệu tồn kho có số lẻ; phải xử lý dữ liệu nguồn trước khi kiểm kê nguyên đơn vị.');
-    }
-    return number_format((float)$value, 0, '', ' ');
+    $raw = kienSoLuongSql(kienDocSoLuong($value));
+    list($whole, $fraction) = explode('.', $raw);
+    $whole = preg_replace('/\B(?=(\d{3})+(?!\d))/', ' ', $whole);
+    $fraction = rtrim($fraction, '0');
+    return $whole . ($fraction !== '' ? '.' . $fraction : '');
 }
 function kienTinhTon(int $heThong, int $thucTe, int $tieuHuy): array
 {
@@ -32,5 +35,5 @@ function kienTinhTon(int $heThong, int $thucTe, int $tieuHuy): array
         throw new InvalidArgumentException('Số lượng không hợp lệ: tiêu hủy không được lớn hơn thực tế.');
     }
     $conLai = $thucTe - $tieuHuy;
-    return ['conLai'=>$conLai, 'chenhLech'=>$conLai - $heThong];
+    return ['conLai'=>$conLai, 'chenhLech'=>$conLai-$heThong];
 }
